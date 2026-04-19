@@ -1,6 +1,8 @@
 package com.jatm.androidphoneapi.server
 
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
+import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
@@ -16,6 +18,8 @@ class EmbeddedKtorApiServer(
     private val logger: RequestOutcomeLogger = NoOpRequestOutcomeLogger,
     private val timeProvider: TimeProvider = SystemTimeProvider,
     private val apiKeyAuthenticator: ApiKeyAuthenticator = DisabledApiKeyAuthenticator(),
+    private val batteryInfoProvider: BatteryInfoProvider? = null,
+    private val deviceInfoProvider: DeviceInfoProvider? = null,
 ) : ApiServer {
     private var engine: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
@@ -35,6 +39,8 @@ class EmbeddedKtorApiServer(
                 timeProvider = timeProvider,
                 logger = logger,
                 apiKeyAuthenticator = apiKeyAuthenticator,
+                batteryInfoProvider = batteryInfoProvider,
+                deviceInfoProvider = deviceInfoProvider,
             )
         }.start(wait = false)
     }

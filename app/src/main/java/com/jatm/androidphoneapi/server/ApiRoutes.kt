@@ -1,6 +1,8 @@
 package com.jatm.androidphoneapi.server
 
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
+import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -28,6 +30,8 @@ fun Application.apiServerModule(
     timeProvider: TimeProvider = SystemTimeProvider,
     logger: RequestOutcomeLogger = NoOpRequestOutcomeLogger,
     apiKeyAuthenticator: ApiKeyAuthenticator = DisabledApiKeyAuthenticator(),
+    batteryInfoProvider: BatteryInfoProvider? = null,
+    deviceInfoProvider: DeviceInfoProvider? = null,
 ) {
     install(ContentNegotiation) {
         json(
@@ -86,6 +90,62 @@ fun Application.apiServerModule(
                 if (!call.requireApiKey(apiKeyAuthenticator)) return@get
 
                 call.respond(mapOf("status" to "authenticated"))
+            }
+
+            get("/battery") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@get
+                val provider = batteryInfoProvider
+                if (provider == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotImplemented,
+                        code = ApiErrorCodes.NOT_IMPLEMENTED,
+                        message = "Battery info is not available",
+                    )
+                    return@get
+                }
+                val info = provider.batteryInfo()
+                call.respond(
+                    BatteryInfoResponse(
+                        level = info.level,
+                        scale = info.scale,
+                        percentage = info.percentage,
+                        status = info.status,
+                        health = info.health,
+                        plugged = info.plugged,
+                        technology = info.technology,
+                        temperatureCelsius = info.temperature,
+                        voltageVolts = info.voltage,
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            get("/device") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@get
+                val provider = deviceInfoProvider
+                if (provider == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotImplemented,
+                        code = ApiErrorCodes.NOT_IMPLEMENTED,
+                        message = "Device info is not available",
+                    )
+                    return@get
+                }
+                val info = provider.deviceInfo()
+                call.respond(
+                    DeviceInfoResponse(
+                        manufacturer = info.manufacturer,
+                        model = info.model,
+                        brand = info.brand,
+                        device = info.device,
+                        product = info.product,
+                        androidVersion = info.androidVersion,
+                        sdkVersion = info.sdkVersion,
+                        securityPatch = info.securityPatch,
+                        uptimeMillis = info.uptimeMillis,
+                        requestId = call.requestId(),
+                    ),
+                )
             }
         }
 

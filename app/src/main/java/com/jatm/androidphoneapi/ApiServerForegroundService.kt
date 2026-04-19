@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.jatm.androidphoneapi.capabilities.AndroidBatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.AndroidDeviceInfoProvider
 import com.jatm.androidphoneapi.server.ApiServer
 import com.jatm.androidphoneapi.server.ApiServerConfig
 import com.jatm.androidphoneapi.server.EmbeddedKtorApiServer
@@ -40,6 +42,8 @@ class ApiServerForegroundService : Service() {
                 config = ApiServerConfig.forBuild(BuildConfig.DEBUG),
                 logger = AndroidRequestOutcomeLogger,
                 apiKeyAuthenticator = AppGraph.apiKeyRepository(applicationContext),
+                batteryInfoProvider = AndroidBatteryInfoProvider(applicationContext),
+                deviceInfoProvider = AndroidDeviceInfoProvider(),
             ).also { it.start() }
             ServerLifecycleRepository.markRunning()
             START_STICKY

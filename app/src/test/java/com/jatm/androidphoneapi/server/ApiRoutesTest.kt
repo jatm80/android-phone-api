@@ -2,6 +2,10 @@ package com.jatm.androidphoneapi.server
 
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthResult
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
+import com.jatm.androidphoneapi.capabilities.BatteryInfo
+import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.DeviceInfo
+import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
@@ -152,6 +156,146 @@ class ApiRoutesTest {
         assertTrue(response.bodyAsText().contains("authenticated"))
     }
 
+    @Test
+    fun batteryEndpointRequiresAuthentication() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                batteryInfoProvider = FakeBatteryInfoProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/battery") {
+            header(RequestIdHeader, "bat-unauth")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("bat-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun batteryEndpointReturnsInfoForAuthenticatedRequest() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                batteryInfoProvider = FakeBatteryInfoProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/battery") {
+            header(RequestIdHeader, "bat-ok")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<BatteryInfoResponse>(response.bodyAsText())
+        assertEquals(75, body.level)
+        assertEquals(100, body.scale)
+        assertEquals(75, body.percentage)
+        assertEquals("discharging", body.status)
+        assertEquals("good", body.health)
+        assertEquals("none", body.plugged)
+        assertEquals("Li-ion", body.technology)
+        assertEquals(25.0f, body.temperatureCelsius)
+        assertEquals(3.8f, body.voltageVolts)
+        assertEquals("bat-ok", body.requestId)
+    }
+
+    @Test
+    fun batteryEndpointReturnsNotImplementedWhenProviderNull() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                batteryInfoProvider = null,
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/battery") {
+            header(RequestIdHeader, "bat-null")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.NOT_IMPLEMENTED, body.error.code)
+        assertEquals("bat-null", body.error.requestId)
+    }
+
+    @Test
+    fun deviceEndpointRequiresAuthentication() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                deviceInfoProvider = FakeDeviceInfoProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/device") {
+            header(RequestIdHeader, "dev-unauth")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("dev-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun deviceEndpointReturnsInfoForAuthenticatedRequest() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                deviceInfoProvider = FakeDeviceInfoProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/device") {
+            header(RequestIdHeader, "dev-ok")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<DeviceInfoResponse>(response.bodyAsText())
+        assertEquals("TestMfg", body.manufacturer)
+        assertEquals("TestModel", body.model)
+        assertEquals("TestBrand", body.brand)
+        assertEquals("testdevice", body.device)
+        assertEquals("testproduct", body.product)
+        assertEquals("14", body.androidVersion)
+        assertEquals(34, body.sdkVersion)
+        assertEquals("2024-01-01", body.securityPatch)
+        assertEquals(123_456L, body.uptimeMillis)
+        assertEquals("dev-ok", body.requestId)
+    }
+
+    @Test
+    fun deviceEndpointReturnsNotImplementedWhenProviderNull() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                deviceInfoProvider = null,
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/device") {
+            header(RequestIdHeader, "dev-null")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.NOT_IMPLEMENTED, body.error.code)
+        assertEquals("dev-null", body.error.requestId)
+    }
+
     private class FakeApiKeyAuthenticator(
         private val result: ApiKeyAuthResult,
     ) : ApiKeyAuthenticator {
@@ -160,5 +304,37 @@ class ApiRoutesTest {
             requestId: String?,
             path: String?,
         ): ApiKeyAuthResult = result
+    }
+
+    private class FakeBatteryInfoProvider(
+        private val info: BatteryInfo = BatteryInfo(
+            level = 75,
+            scale = 100,
+            percentage = 75,
+            status = "discharging",
+            health = "good",
+            plugged = "none",
+            technology = "Li-ion",
+            temperature = 25.0f,
+            voltage = 3.8f,
+        ),
+    ) : BatteryInfoProvider {
+        override fun batteryInfo(): BatteryInfo = info
+    }
+
+    private class FakeDeviceInfoProvider(
+        private val info: DeviceInfo = DeviceInfo(
+            manufacturer = "TestMfg",
+            model = "TestModel",
+            brand = "TestBrand",
+            device = "testdevice",
+            product = "testproduct",
+            androidVersion = "14",
+            sdkVersion = 34,
+            securityPatch = "2024-01-01",
+            uptimeMillis = 123_456L,
+        ),
+    ) : DeviceInfoProvider {
+        override fun deviceInfo(): DeviceInfo = info
     }
 }
