@@ -31,28 +31,20 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.jatm.androidphoneapi.apikey.ApiKeyUiState
-import com.jatm.androidphoneapi.pairing.PairingRequestRecord
-import com.jatm.androidphoneapi.pairing.PairingState
-import com.jatm.androidphoneapi.pairing.TrustedClient
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val pairingRepository = remember {
-                AppGraph.pairingRepository(applicationContext)
-            }
             val apiKeyRepository = remember {
                 AppGraph.apiKeyRepository(applicationContext)
             }
             val lifecycleState by ServerLifecycleRepository.state.collectAsState()
-            val pairingState by pairingRepository.state.collectAsState()
             val apiKeyState by apiKeyRepository.state.collectAsState()
 
             AndroidPhoneApiApp(
                 lifecycleState = lifecycleState,
-                pairingState = pairingState,
                 apiKeyState = apiKeyState,
                 onStartServer = {
                     ContextCompat.startForegroundService(
@@ -64,9 +56,6 @@ class MainActivity : ComponentActivity() {
                     ServerLifecycleRepository.markStopping()
                     stopService(ApiServerForegroundService.stopIntent(this))
                 },
-                onApprovePairing = pairingRepository::approvePairing,
-                onDenyPairing = pairingRepository::denyPairing,
-                onRevokeClient = pairingRepository::revokeClient,
                 onApiEnabledChange = apiKeyRepository::setEnabled,
                 onRevealApiKey = apiKeyRepository::presentKey,
                 onResetApiKey = apiKeyRepository::resetKey,
@@ -78,13 +67,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AndroidPhoneApiApp(
     lifecycleState: ServerLifecycleState,
-    pairingState: PairingState,
     apiKeyState: ApiKeyUiState,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
-    onApprovePairing: (String) -> Unit,
-    onDenyPairing: (String) -> Unit,
-    onRevokeClient: (String) -> Unit,
     onApiEnabledChange: (Boolean) -> Unit,
     onRevealApiKey: () -> Unit,
     onResetApiKey: () -> Unit,
@@ -96,13 +81,9 @@ fun AndroidPhoneApiApp(
         ) {
             ServerHomeScreen(
                 lifecycleState = lifecycleState,
-                pairingState = pairingState,
                 apiKeyState = apiKeyState,
                 onStartServer = onStartServer,
                 onStopServer = onStopServer,
-                onApprovePairing = onApprovePairing,
-                onDenyPairing = onDenyPairing,
-                onRevokeClient = onRevokeClient,
                 onApiEnabledChange = onApiEnabledChange,
                 onRevealApiKey = onRevealApiKey,
                 onResetApiKey = onResetApiKey,
@@ -114,13 +95,9 @@ fun AndroidPhoneApiApp(
 @Composable
 private fun ServerHomeScreen(
     lifecycleState: ServerLifecycleState,
-    pairingState: PairingState,
     apiKeyState: ApiKeyUiState,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
-    onApprovePairing: (String) -> Unit,
-    onDenyPairing: (String) -> Unit,
-    onRevokeClient: (String) -> Unit,
     onApiEnabledChange: (Boolean) -> Unit,
     onRevealApiKey: () -> Unit,
     onResetApiKey: () -> Unit,
@@ -205,19 +182,6 @@ private fun ServerHomeScreen(
             onRevealApiKey = onRevealApiKey,
             onResetApiKey = onResetApiKey,
         )
-
-        HorizontalDivider()
-
-        PairingRequestsSection(
-            requests = pairingState.pendingRequests,
-            onApprovePairing = onApprovePairing,
-            onDenyPairing = onDenyPairing,
-        )
-
-        TrustedClientsSection(
-            clients = pairingState.trustedClients,
-            onRevokeClient = onRevokeClient,
-        )
     }
 }
 
@@ -274,99 +238,3 @@ private fun ApiKeyControlsSection(
         }
     }
 }
-
-@Composable
-private fun PairingRequestsSection(
-    requests: List<PairingRequestRecord>,
-    onApprovePairing: (String) -> Unit,
-    onDenyPairing: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "Pending pairing",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        if (requests.isEmpty()) {
-            Text(
-                text = "No pending requests",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        requests.forEach { request ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = request.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "Code ${request.verificationCode} · ${request.shortFingerprint()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { onApprovePairing(request.id) }) {
-                            Text("Approve")
-                        }
-                        OutlinedButton(onClick = { onDenyPairing(request.id) }) {
-                            Text("Deny")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrustedClientsSection(
-    clients: List<TrustedClient>,
-    onRevokeClient: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "Trusted clients",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        if (clients.isEmpty()) {
-            Text(
-                text = "No trusted clients",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        clients.forEach { client ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = client.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "${if (client.isActive) "Active" else "Revoked"} · ${client.shortFingerprint()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (client.isActive) {
-                        OutlinedButton(onClick = { onRevokeClient(client.id) }) {
-                            Text("Revoke")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun PairingRequestRecord.shortFingerprint(): String =
-    publicKeyFingerprintSha256.take(23)
-
-private fun TrustedClient.shortFingerprint(): String =
-    publicKeyFingerprintSha256.take(23)

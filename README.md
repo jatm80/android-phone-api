@@ -48,5 +48,5 @@ Tooling baseline:
 Android assumptions:
 - The active server lifecycle uses a foreground service with `dataSync` type until the concrete server transport is implemented and validated.
 - Notification permission handling is not implemented yet; the current scaffold only declares the permission needed by modern Android notification behavior.
-- mTLS and per-client identity are not part of the current simplified auth model; the shared API key is the current authentication mechanism.
+- mTLS client-certificate pairing code has been removed. The shared API key is the sole authentication mechanism. mTLS may be reconsidered in a future ADR if the project outgrows the shared key model.
 - Unit coverage is below the repository target while the app consists mostly of Android UI and foreground-service scaffolding; instrumentation coverage should be added as lifecycle and UI behavior hardens.

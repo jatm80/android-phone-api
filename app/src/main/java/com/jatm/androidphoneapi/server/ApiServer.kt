@@ -1,7 +1,5 @@
 package com.jatm.androidphoneapi.server
 
-import com.jatm.androidphoneapi.pairing.InMemoryPairingStore
-import com.jatm.androidphoneapi.pairing.PairingRepository
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
@@ -18,10 +16,6 @@ class EmbeddedKtorApiServer(
     private val logger: RequestOutcomeLogger = NoOpRequestOutcomeLogger,
     private val timeProvider: TimeProvider = SystemTimeProvider,
     private val apiKeyAuthenticator: ApiKeyAuthenticator = DisabledApiKeyAuthenticator(),
-    private val pairingRepository: PairingRepository = PairingRepository(
-        store = InMemoryPairingStore(),
-        timeProvider = timeProvider,
-    ),
 ) : ApiServer {
     private var engine: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
@@ -41,7 +35,6 @@ class EmbeddedKtorApiServer(
                 timeProvider = timeProvider,
                 logger = logger,
                 apiKeyAuthenticator = apiKeyAuthenticator,
-                pairingRepository = pairingRepository,
             )
         }.start(wait = false)
     }

@@ -128,8 +128,7 @@ Constraints:
 - The server should prefer local-network exposure and avoid public internet assumptions.
 
 Risks to validate in implementation:
-- Android behavior for embedded TLS and client certificate authentication.
-- Ktor/CIO mTLS configuration details on Android.
+- Android behavior for embedded TLS server certificates.
 - APK size and dependency footprint.
 
 Alternatives considered:
@@ -187,7 +186,7 @@ Log or audit:
 For notification, file, location, and similar endpoints, log metadata and outcome rather than sensitive payloads.
 
 ## Hardening Checklist
-- Enforce HTTPS/mTLS by default.
+- Enforce HTTPS by default.
 - Keep plaintext transport behind explicit debug/test gates only.
 - Generate API keys in-app with a cryptographically secure random source.
 - Store recoverable API-key material with Android-appropriate protection, preferring Keystore-backed encryption.

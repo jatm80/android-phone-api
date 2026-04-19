@@ -1,14 +1,5 @@
 package com.jatm.androidphoneapi.server
 
-import com.jatm.androidphoneapi.pairing.CreatePairingRequest
-import com.jatm.androidphoneapi.pairing.CreatePairingResponse
-import com.jatm.androidphoneapi.pairing.InMemoryPairingStore
-import com.jatm.androidphoneapi.pairing.PairingExpiredException
-import com.jatm.androidphoneapi.pairing.PairingNotFoundException
-import com.jatm.androidphoneapi.pairing.PairingRepository
-import com.jatm.androidphoneapi.pairing.PairingStatusResponse
-import com.jatm.androidphoneapi.pairing.PairingValidationException
-import com.jatm.androidphoneapi.pairing.apiValue
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -19,13 +10,10 @@ import io.ktor.server.plugins.callid.CallId
 import io.ktor.server.plugins.callid.callId
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.plugins.statuspages.exception
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
@@ -40,10 +28,6 @@ fun Application.apiServerModule(
     timeProvider: TimeProvider = SystemTimeProvider,
     logger: RequestOutcomeLogger = NoOpRequestOutcomeLogger,
     apiKeyAuthenticator: ApiKeyAuthenticator = DisabledApiKeyAuthenticator(),
-    pairingRepository: PairingRepository = PairingRepository(
-        store = InMemoryPairingStore(),
-        timeProvider = timeProvider,
-    ),
 ) {
     install(ContentNegotiation) {
         json(
@@ -65,15 +49,6 @@ fun Application.apiServerModule(
 
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            if (cause is PairingValidationException) {
-                call.respondError(
-                    status = HttpStatusCode.BadRequest,
-                    code = ApiErrorCodes.INVALID_REQUEST,
-                    message = "Invalid pairing request",
-                )
-                return@exception
-            }
-
             logger.log(
                 RequestOutcome(
                     requestId = call.requestId(),
@@ -111,51 +86,6 @@ fun Application.apiServerModule(
                 if (!call.requireApiKey(apiKeyAuthenticator)) return@get
 
                 call.respond(mapOf("status" to "authenticated"))
-            }
-
-            route("/pairing") {
-                post("/requests") {
-                    val pairingRequest = pairingRepository.createPending(call.receive<CreatePairingRequest>())
-                    call.respond(
-                        HttpStatusCode.Accepted,
-                        CreatePairingResponse(
-                            pairingId = pairingRequest.id,
-                            status = pairingRequest.status.apiValue(),
-                            verificationCode = pairingRequest.verificationCode,
-                            expiresAtEpochMillis = pairingRequest.expiresAtEpochMillis,
-                            requestId = call.requestId(),
-                        ),
-                    )
-                }
-
-                get("/requests/{pairingId}") {
-                    val pairingId = call.parameters["pairingId"].orEmpty()
-                    val pairingRequest = pairingRepository.getPairingRequest(pairingId)
-                    if (pairingRequest == null) {
-                        call.respondError(
-                            status = HttpStatusCode.NotFound,
-                            code = ApiErrorCodes.PAIRING_NOT_FOUND,
-                            message = "Pairing request not found",
-                        )
-                        return@get
-                    }
-
-                    val status = if (pairingRequest.status.name == "EXPIRED") {
-                        HttpStatusCode.Gone
-                    } else {
-                        HttpStatusCode.OK
-                    }
-                    call.respond(
-                        status,
-                        PairingStatusResponse(
-                            pairingId = pairingRequest.id,
-                            status = pairingRequest.status.apiValue(),
-                            clientId = pairingRequest.clientId,
-                            expiresAtEpochMillis = pairingRequest.expiresAtEpochMillis,
-                            requestId = call.requestId(),
-                        ),
-                    )
-                }
             }
         }
 
