@@ -1,0 +1,67 @@
+# Android / Gradle
+.gradle/
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Kotlin / Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+
+# Generated Android artifacts
+*.apk
+*.ap_
+*.aab
+*.aar
+*.dex
+*.keystore
+*.jks
+*.p12
+*.pem
+*.der
+
+# Signing and secrets
+keystore.properties
+signing.properties
+secrets.properties
+*.env
+.env
+.env.*
+!.env.example
+
+# Test and coverage output
+coverage/
+reports/
+test-results/
+jacoco.exec
+*.ec
+
+# Docker / local runtime state
+.docker/
+docker-data/
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local tooling
+.codex
