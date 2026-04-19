@@ -57,4 +57,16 @@ Gradle dependencies are cached in the named Docker volume `gradle-cache`. Build 
 Gradle's project cache is also redirected into the container-owned Gradle cache volume with `org.gradle.projectcachedir=/home/android/.gradle/project-cache`. This avoids permission failures when CI bind-mounts the checked-out repository at `/workspace`.
 
 ## CI
+
 GitHub Actions uses the same Dockerfile and `docker compose` services as local development. Keep local and CI commands aligned when adding build, lint, test, or coverage steps.
+
+### CI enhancements
+
+The workflow at `.github/workflows/android.yml` includes:
+
+- **Docker Buildx** with layer caching via `actions/cache` to speed up image rebuilds.
+- **Coverage report artifact** — the JaCoCo HTML/XML coverage report is uploaded as a build artifact (`coverage-report`) and retained for 14 days.
+- **Debug APK artifact** — the assembled debug APK is uploaded as a build artifact (`debug-apk`) and retained for 14 days.
+- **JaCoCo report configuration** — `app/build.gradle.kts` configures JaCoCo to produce both XML and HTML reports. A hard 90% coverage enforcement gate is deferred until UI-untestable code is separated or covered by instrumentation tests.
+
+Since docker-compose bind-mounts `.:/workspace`, build outputs (reports, APKs) are available on the host after each step without extra extraction.
