@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Android Phone API</string>
+    <string name="server_notification_channel_name">API server</string>
+</resources>
