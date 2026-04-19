@@ -2,6 +2,7 @@ package com.jatm.androidphoneapi.audit
 
 import com.jatm.androidphoneapi.apikey.ApiKeyAuditEvent
 import com.jatm.androidphoneapi.apikey.ApiKeyAuditEventType
+import com.jatm.androidphoneapi.server.TimeProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -104,10 +105,48 @@ class AuditRepositoryTest {
         assertFalse(serialized.contains("Bearer"))
     }
 
+    @Test
+    fun logAccessPersistsEvent() {
+        val repository = repository()
+
+        repository.logAccess(
+            type = "BATTERY_READ",
+            requestId = "req-42",
+            path = "/api/v1/battery",
+        )
+
+        val events = repository.events()
+        assertEquals(1, events.size)
+        val event = events.single()
+        assertEquals("BATTERY_READ", event.type)
+        assertEquals("req-42", event.requestId)
+        assertEquals("/api/v1/battery", event.path)
+        assertEquals(99_000L, event.timestampEpochMillis)
+    }
+
+    @Test
+    fun logAccessAppearsInEventsFlow() {
+        val repository = repository()
+
+        repository.logAccess(
+            type = "DEVICE_READ",
+            requestId = "req-7",
+            path = "/api/v1/device",
+        )
+
+        val snapshot = repository.eventsFlow.value
+        assertEquals(1, snapshot.size)
+        assertEquals("DEVICE_READ", snapshot.single().type)
+    }
+
     private fun repository(
         store: AuditStore = InMemoryAuditStore(),
         ids: MutableList<String> = mutableListOf("id-1", "id-2", "id-3", "id-4"),
-    ): AuditRepository = AuditRepository(store = store, idGenerator = { ids.removeAt(0) })
+    ): AuditRepository = AuditRepository(
+        store = store,
+        timeProvider = TimeProvider { 99_000L },
+        idGenerator = { ids.removeAt(0) },
+    )
 
     private fun idSequence(): () -> String {
         var counter = 0

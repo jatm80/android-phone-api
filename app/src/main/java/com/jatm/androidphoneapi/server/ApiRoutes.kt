@@ -1,6 +1,8 @@
 package com.jatm.androidphoneapi.server
 
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
+import com.jatm.androidphoneapi.audit.ApiAuditLogger
+import com.jatm.androidphoneapi.audit.NoOpApiAuditLogger
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
 import com.jatm.androidphoneapi.capabilities.NotificationRequest
@@ -37,6 +39,7 @@ fun Application.apiServerModule(
     batteryInfoProvider: BatteryInfoProvider? = null,
     deviceInfoProvider: DeviceInfoProvider? = null,
     notificationSender: NotificationSender? = null,
+    auditLogger: ApiAuditLogger = NoOpApiAuditLogger,
 ) {
     install(ContentNegotiation) {
         json(
@@ -95,6 +98,7 @@ fun Application.apiServerModule(
                 if (!call.requireApiKey(apiKeyAuthenticator)) return@get
 
                 call.respond(mapOf("status" to "authenticated"))
+                auditLogger.logAccess("AUTH_CHECK", call.requestId(), call.request.path())
             }
 
             get("/battery") {
@@ -123,6 +127,7 @@ fun Application.apiServerModule(
                         requestId = call.requestId(),
                     ),
                 )
+                auditLogger.logAccess("BATTERY_READ", call.requestId(), call.request.path())
             }
 
             get("/device") {
@@ -151,6 +156,7 @@ fun Application.apiServerModule(
                         requestId = call.requestId(),
                     ),
                 )
+                auditLogger.logAccess("DEVICE_READ", call.requestId(), call.request.path())
             }
 
             post("/notify") {
@@ -189,6 +195,7 @@ fun Application.apiServerModule(
                         requestId = call.requestId(),
                     ),
                 )
+                auditLogger.logAccess("NOTIFICATION_SENT", call.requestId(), call.request.path())
             }
         }
 

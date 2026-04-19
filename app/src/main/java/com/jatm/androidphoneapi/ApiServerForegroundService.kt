@@ -46,6 +46,7 @@ class ApiServerForegroundService : Service() {
                 batteryInfoProvider = AndroidBatteryInfoProvider(applicationContext),
                 deviceInfoProvider = AndroidDeviceInfoProvider(),
                 notificationSender = AndroidNotificationSender(applicationContext),
+                auditLogger = AppGraph.auditRepository(applicationContext),
             ).also { it.start() }
             ServerLifecycleRepository.markRunning()
             START_STICKY

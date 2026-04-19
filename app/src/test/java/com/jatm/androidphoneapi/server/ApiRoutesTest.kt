@@ -2,6 +2,7 @@ package com.jatm.androidphoneapi.server
 
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthResult
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
+import com.jatm.androidphoneapi.audit.ApiAuditLogger
 import com.jatm.androidphoneapi.capabilities.BatteryInfo
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfo
@@ -403,6 +404,31 @@ class ApiRoutesTest {
     }
 
     @Test
+    fun authenticatedBatteryRequestAuditsAccess() = testApplication {
+        val auditLogger = CapturingApiAuditLogger()
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                batteryInfoProvider = FakeBatteryInfoProvider(),
+                auditLogger = auditLogger,
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/battery") {
+            header(RequestIdHeader, "bat-audit")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(1, auditLogger.events.size)
+        val captured = auditLogger.events.single()
+        assertEquals("BATTERY_READ", captured.type)
+        assertEquals("bat-audit", captured.requestId)
+        assertEquals("/api/v1/battery", captured.path)
+    }
+
+    @Test
     fun notifyEndpointRejectsTooLongBody() = testApplication {
         application {
             apiServerModule(
@@ -425,6 +451,20 @@ class ApiRoutesTest {
         assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
         assertTrue(body.error.message.contains("body"))
     }
+
+    private class CapturingApiAuditLogger : ApiAuditLogger {
+        val events = mutableListOf<CapturedAuditEvent>()
+        override fun logAccess(type: String, requestId: String?, path: String?, reason: String?) {
+            events.add(CapturedAuditEvent(type, requestId, path, reason))
+        }
+    }
+
+    private data class CapturedAuditEvent(
+        val type: String,
+        val requestId: String?,
+        val path: String?,
+        val reason: String?,
+    )
 
     private class FakeApiKeyAuthenticator(
         private val result: ApiKeyAuthResult,

@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.jatm.androidphoneapi.apikey.ApiKeyUiState
+import com.jatm.androidphoneapi.audit.AuditEvent
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,12 +41,17 @@ class MainActivity : ComponentActivity() {
             val apiKeyRepository = remember {
                 AppGraph.apiKeyRepository(applicationContext)
             }
+            val auditRepository = remember {
+                AppGraph.auditRepository(applicationContext)
+            }
             val lifecycleState by ServerLifecycleRepository.state.collectAsState()
             val apiKeyState by apiKeyRepository.state.collectAsState()
+            val auditEvents by auditRepository.eventsFlow.collectAsState()
 
             AndroidPhoneApiApp(
                 lifecycleState = lifecycleState,
                 apiKeyState = apiKeyState,
+                auditEvents = auditEvents,
                 onStartServer = {
                     ContextCompat.startForegroundService(
                         this,
@@ -59,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 onApiEnabledChange = apiKeyRepository::setEnabled,
                 onRevealApiKey = apiKeyRepository::presentKey,
                 onResetApiKey = apiKeyRepository::resetKey,
+                onClearAudit = auditRepository::clear,
             )
         }
     }
@@ -68,11 +75,13 @@ class MainActivity : ComponentActivity() {
 fun AndroidPhoneApiApp(
     lifecycleState: ServerLifecycleState,
     apiKeyState: ApiKeyUiState,
+    auditEvents: List<AuditEvent>,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onApiEnabledChange: (Boolean) -> Unit,
     onRevealApiKey: () -> Unit,
     onResetApiKey: () -> Unit,
+    onClearAudit: () -> Unit,
 ) {
     MaterialTheme {
         Surface(
@@ -82,11 +91,13 @@ fun AndroidPhoneApiApp(
             ServerHomeScreen(
                 lifecycleState = lifecycleState,
                 apiKeyState = apiKeyState,
+                auditEvents = auditEvents,
                 onStartServer = onStartServer,
                 onStopServer = onStopServer,
                 onApiEnabledChange = onApiEnabledChange,
                 onRevealApiKey = onRevealApiKey,
                 onResetApiKey = onResetApiKey,
+                onClearAudit = onClearAudit,
             )
         }
     }
@@ -96,11 +107,13 @@ fun AndroidPhoneApiApp(
 private fun ServerHomeScreen(
     lifecycleState: ServerLifecycleState,
     apiKeyState: ApiKeyUiState,
+    auditEvents: List<AuditEvent>,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onApiEnabledChange: (Boolean) -> Unit,
     onRevealApiKey: () -> Unit,
     onResetApiKey: () -> Unit,
+    onClearAudit: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -182,6 +195,13 @@ private fun ServerHomeScreen(
             onRevealApiKey = onRevealApiKey,
             onResetApiKey = onResetApiKey,
         )
+
+        HorizontalDivider()
+
+        AuditLogSection(
+            events = auditEvents,
+            onClearAudit = onClearAudit,
+        )
     }
 }
 
@@ -237,4 +257,65 @@ private fun ApiKeyControlsSection(
             }
         }
     }
+}
+
+@Composable
+private fun AuditLogSection(
+    events: List<AuditEvent>,
+    onClearAudit: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "Audit log", style = MaterialTheme.typography.titleLarge)
+            if (events.isNotEmpty()) {
+                OutlinedButton(onClick = onClearAudit) { Text("Clear") }
+            }
+        }
+        if (events.isEmpty()) {
+            Text(
+                text = "No audit events",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        events.takeLast(50).reversed().forEach { event ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(text = event.type, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = formatTimestamp(event.timestampEpochMillis),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    event.path?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                    event.reason?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatTimestamp(epochMillis: Long): String {
+    val instant = java.time.Instant.ofEpochMilli(epochMillis)
+    val zoned = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
+    return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(zoned)
 }
