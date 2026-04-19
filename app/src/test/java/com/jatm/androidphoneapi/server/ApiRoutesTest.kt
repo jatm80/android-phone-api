@@ -3,8 +3,13 @@ package com.jatm.androidphoneapi.server
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthResult
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import com.jatm.androidphoneapi.audit.ApiAuditLogger
+import com.jatm.androidphoneapi.capabilities.AudioRecordingProvider
 import com.jatm.androidphoneapi.capabilities.BatteryInfo
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.CameraDescription
+import com.jatm.androidphoneapi.capabilities.CameraProvider
+import com.jatm.androidphoneapi.capabilities.CaptureRequest
+import com.jatm.androidphoneapi.capabilities.CaptureResult
 import com.jatm.androidphoneapi.capabilities.ClipboardContent
 import com.jatm.androidphoneapi.capabilities.ClipboardProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfo
@@ -14,6 +19,15 @@ import com.jatm.androidphoneapi.capabilities.LocationProvider
 import com.jatm.androidphoneapi.capabilities.NotificationRequest
 import com.jatm.androidphoneapi.capabilities.NotificationResult
 import com.jatm.androidphoneapi.capabilities.NotificationSender
+import com.jatm.androidphoneapi.capabilities.TtsEngineInfo
+import com.jatm.androidphoneapi.capabilities.TtsProvider
+import com.jatm.androidphoneapi.capabilities.TtsRequest
+import com.jatm.androidphoneapi.capabilities.TtsResult
+import com.jatm.androidphoneapi.capabilities.RecordingRequest
+import com.jatm.androidphoneapi.capabilities.RecordingResult
+import com.jatm.androidphoneapi.capabilities.SmsSender
+import com.jatm.androidphoneapi.capabilities.SmsRequest
+import com.jatm.androidphoneapi.capabilities.SmsResult
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -759,5 +773,422 @@ class ApiRoutesTest {
         val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
         assertEquals(ApiErrorCodes.NOT_IMPLEMENTED, body.error.code)
         assertEquals("loc-not-impl", body.error.requestId)
+    }
+
+    // --- Audio recording tests ---
+
+    private class FakeAudioRecordingProvider(
+        private val result: RecordingResult = RecordingResult(
+            success = false,
+            errorReason = "recording_requires_foreground_service_and_permission",
+        ),
+    ) : AudioRecordingProvider {
+        var lastRequest: RecordingRequest? = null
+            private set
+
+        override fun startRecording(request: RecordingRequest): RecordingResult {
+            lastRequest = request
+            return result
+        }
+    }
+
+    @Test
+    fun audioRecordRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                audioRecordingProvider = FakeAudioRecordingProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/audio/record") {
+            header(RequestIdHeader, "audio-unauth")
+            contentType(ContentType.Application.Json)
+            setBody("""{"durationSeconds":5}""")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("audio-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun audioRecordValidatesDuration() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                audioRecordingProvider = FakeAudioRecordingProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/audio/record") {
+            header(RequestIdHeader, "audio-bad-dur")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"durationSeconds":500}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("durationSeconds"))
+    }
+
+    @Test
+    fun audioRecordReturnsResult() = testApplication {
+        val fakeProvider = FakeAudioRecordingProvider()
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                audioRecordingProvider = fakeProvider,
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/audio/record") {
+            header(RequestIdHeader, "audio-ok")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"durationSeconds":10,"format":"mp4","quality":"medium"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<AudioRecordResponse>(response.bodyAsText())
+        assertEquals(false, body.success)
+        assertEquals("recording_requires_foreground_service_and_permission", body.errorReason)
+        assertEquals("audio-ok", body.requestId)
+
+        val sent = fakeProvider.lastRequest
+        assertEquals(10, sent?.durationSeconds)
+        assertEquals("mp4", sent?.format)
+        assertEquals("medium", sent?.quality)
+    }
+
+    // --- SMS tests ---
+
+    private class FakeSmsSender(
+        private val result: SmsResult = SmsResult(
+            sent = false,
+            recipientCount = 0,
+            errorReason = "sms_requires_permission_and_approval",
+        ),
+    ) : SmsSender {
+        var lastRequest: SmsRequest? = null
+            private set
+
+        override fun send(request: SmsRequest): SmsResult {
+            lastRequest = request
+            return result
+        }
+    }
+
+    @Test
+    fun smsSendRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                smsSender = FakeSmsSender(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/sms/send") {
+            header(RequestIdHeader, "sms-unauth")
+            contentType(ContentType.Application.Json)
+            setBody("""{"recipients":["+1234567890"],"message":"Hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("sms-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun smsSendValidatesEmptyRecipients() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                smsSender = FakeSmsSender(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/sms/send") {
+            header(RequestIdHeader, "sms-empty")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"recipients":[],"message":"Hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("recipients"))
+    }
+
+    @Test
+    fun smsSendValidatesMessageLength() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                smsSender = FakeSmsSender(),
+            )
+        }
+
+        val longMessage = "x".repeat(1601)
+        val response = client.post("$ApiVersionPrefix/sms/send") {
+            header(RequestIdHeader, "sms-long")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"recipients":["+1234567890"],"message":"$longMessage"}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("message"))
+    }
+
+    @Test
+    fun smsSendReturnsResult() = testApplication {
+        val fakeSender = FakeSmsSender()
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                smsSender = fakeSender,
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/sms/send") {
+            header(RequestIdHeader, "sms-ok")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"recipients":["+1234567890","+0987654321"],"message":"Hello World"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<SmsSendResponse>(response.bodyAsText())
+        assertEquals(false, body.sent)
+        assertEquals(0, body.recipientCount)
+        assertEquals("sms_requires_permission_and_approval", body.errorReason)
+        assertEquals("sms-ok", body.requestId)
+
+        val sent = fakeSender.lastRequest
+        assertEquals(listOf("+1234567890", "+0987654321"), sent?.recipients)
+        assertEquals("Hello World", sent?.message)
+    }
+
+    // --- TTS tests ---
+
+    private class FakeTtsProvider(
+        private val speakResult: TtsResult = TtsResult(spoken = true),
+        private val engineList: List<TtsEngineInfo> = listOf(
+            TtsEngineInfo(name = "com.google.tts", label = "Google TTS", isDefault = true),
+        ),
+    ) : TtsProvider {
+        override fun speak(request: TtsRequest): TtsResult = speakResult
+        override fun engines(): List<TtsEngineInfo> = engineList
+    }
+
+    @Test
+    fun ttsSpeakRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                ttsProvider = FakeTtsProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/tts/speak") {
+            header(RequestIdHeader, "tts-unauth")
+            contentType(ContentType.Application.Json)
+            setBody("""{"text":"hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("tts-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun ttsSpeakValidatesEmptyText() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                ttsProvider = FakeTtsProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/tts/speak") {
+            header(RequestIdHeader, "tts-empty")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"text":""}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("text"))
+    }
+
+    @Test
+    fun ttsSpeakSucceeds() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                ttsProvider = FakeTtsProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/tts/speak") {
+            header(RequestIdHeader, "tts-ok")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"text":"Hello world"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<TtsSpeakResponse>(response.bodyAsText())
+        assertTrue(body.spoken)
+        assertEquals("tts-ok", body.requestId)
+    }
+
+    @Test
+    fun ttsEnginesRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                ttsProvider = FakeTtsProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/tts/engines") {
+            header(RequestIdHeader, "tts-eng-unauth")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("tts-eng-unauth", body.error.requestId)
+    }
+
+    // --- Camera tests ---
+
+    private class FakeCameraProvider(
+        private val cameraList: List<CameraDescription> = listOf(
+            CameraDescription(id = "0", facing = "back", megapixels = 12.0f),
+            CameraDescription(id = "1", facing = "front", megapixels = 8.0f),
+        ),
+        private val captureResult: CaptureResult = CaptureResult(
+            success = false,
+            errorReason = "capture_requires_foreground_ui",
+        ),
+    ) : CameraProvider {
+        override fun cameras(): List<CameraDescription> = cameraList
+        override fun capture(request: CaptureRequest): CaptureResult = captureResult
+    }
+
+    @Test
+    fun cameraListRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                cameraProvider = FakeCameraProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/camera/list") {
+            header(RequestIdHeader, "cam-list-unauth")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("cam-list-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun cameraListReturnsCameras() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                cameraProvider = FakeCameraProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/camera/list") {
+            header(RequestIdHeader, "cam-list-ok")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<CameraListResponse>(response.bodyAsText())
+        assertEquals(2, body.cameras.size)
+        assertEquals("0", body.cameras[0].id)
+        assertEquals("back", body.cameras[0].facing)
+        assertEquals(12.0f, body.cameras[0].megapixels)
+        assertEquals("1", body.cameras[1].id)
+        assertEquals("front", body.cameras[1].facing)
+        assertEquals("cam-list-ok", body.requestId)
+    }
+
+    @Test
+    fun cameraCaptureRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                cameraProvider = FakeCameraProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/camera/capture") {
+            header(RequestIdHeader, "cam-cap-unauth")
+            contentType(ContentType.Application.Json)
+            setBody("""{"facing":"back"}""")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("cam-cap-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun cameraCaptureReturnsResult() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                cameraProvider = FakeCameraProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/camera/capture") {
+            header(RequestIdHeader, "cam-cap-ok")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"facing":"back"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<CameraCaptureResponse>(response.bodyAsText())
+        assertEquals(false, body.success)
+        assertEquals("capture_requires_foreground_ui", body.errorReason)
+        assertEquals("cam-cap-ok", body.requestId)
     }
 }

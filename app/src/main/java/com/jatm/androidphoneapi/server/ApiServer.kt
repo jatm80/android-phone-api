@@ -3,11 +3,15 @@ package com.jatm.androidphoneapi.server
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import com.jatm.androidphoneapi.audit.ApiAuditLogger
 import com.jatm.androidphoneapi.audit.NoOpApiAuditLogger
+import com.jatm.androidphoneapi.capabilities.AudioRecordingProvider
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.CameraProvider
 import com.jatm.androidphoneapi.capabilities.ClipboardProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
 import com.jatm.androidphoneapi.capabilities.LocationProvider
 import com.jatm.androidphoneapi.capabilities.NotificationSender
+import com.jatm.androidphoneapi.capabilities.TtsProvider
+import com.jatm.androidphoneapi.capabilities.SmsSender
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
@@ -28,7 +32,11 @@ class EmbeddedKtorApiServer(
     private val notificationSender: NotificationSender? = null,
     private val clipboardProvider: ClipboardProvider? = null,
     private val locationProvider: LocationProvider? = null,
+    private val ttsProvider: TtsProvider? = null,
+    private val cameraProvider: CameraProvider? = null,
     private val auditLogger: ApiAuditLogger = NoOpApiAuditLogger,
+    private val audioRecordingProvider: AudioRecordingProvider? = null,
+    private val smsSender: SmsSender? = null,
 ) : ApiServer {
     private var engine: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
@@ -53,7 +61,11 @@ class EmbeddedKtorApiServer(
                 notificationSender = notificationSender,
                 clipboardProvider = clipboardProvider,
                 locationProvider = locationProvider,
+                ttsProvider = ttsProvider,
+                cameraProvider = cameraProvider,
                 auditLogger = auditLogger,
+                audioRecordingProvider = audioRecordingProvider,
+                smsSender = smsSender,
             )
         }.start(wait = false)
     }
