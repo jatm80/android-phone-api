@@ -41,7 +41,7 @@ Build a standalone Android application inspired by the goal of Termux:API, but d
 - auditable actions,
 - clear capability boundaries.
 
-The app should let trusted clients call selected phone capabilities such as:
+The app should let homelab callers with the shared API key call selected phone capabilities such as:
 - health and status
 - battery and device info
 - user-visible notifications
@@ -200,12 +200,10 @@ Codex should optimize for a small, secure homelab project before stretching into
 ### Core scope
 - embedded HTTPS server
 - API-key authentication and phone-side controls
-- per-client capability grants
 - health endpoint
 - battery and device info endpoints
 - send notification to phone
 - audit log viewer
-- simple client management UI
 - sample homelab client
 
 ### Optional after core basics are stable
@@ -274,8 +272,8 @@ A task is done only when:
 3. architecture and module layout
 4. API-key auth design
 5. embedded server skeleton
-6. per-client policy enforcement
+6. shared API-key authentication and audit logging
 7. first end-to-end core capability
-8. audit logging and client management UI
+8. audit log UI
 9. sample homelab client
 10. testing and hardening pass

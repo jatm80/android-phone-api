@@ -176,26 +176,7 @@ Search for `pairing`, `mTLS`, `client certificate`, trust store, certificate fin
 
 ---
 
-## Task-007 — Build capability policy enforcement
-**Recommended agent(s):** security, api-server
-
-### Goal
-Enforce per-client authorization on every privileged endpoint.
-
-### Deliverables
-- capability enum/model
-- deny-by-default policy engine
-- middleware enforcement
-- initial admin UI hooks or storage model
-
-### Acceptance criteria
-- each endpoint declares its capability requirement
-- unauthorized calls fail predictably and are logged
-- policy logic has unit tests
-
----
-
-## Task-008 — Persist secrets, clients, grants, and audit metadata
+## Task-007 — Persist API secrets and audit metadata
 **Recommended agent(s):** android-platform, security
 
 ### Goal
@@ -204,16 +185,16 @@ Store operational state safely.
 ### Deliverables
 - Room schema or equivalent
 - Keystore-backed secret handling
-- storage for clients, grants, and audit metadata
+- storage for API enabled state, API key metadata, and audit metadata
 
 ### Acceptance criteria
-- trust material is not stored insecurely
-- server restarts preserve enrolled clients and grants
+- API key material is not stored insecurely
+- server restarts preserve API enabled state and audit metadata
 - migration strategy is at least minimally considered
 
 ---
 
-## Task-009 — Add core endpoint: battery and device info
+## Task-008 — Add core endpoint: battery and device info
 **Recommended agent(s):** android-platform, api-server
 
 ### Goal
@@ -226,13 +207,13 @@ Ship the first genuinely useful, low-risk API capability.
 - tests
 
 ### Acceptance criteria
-- trusted authorized client can retrieve data
-- unauthorized client cannot
+- requests with a valid enabled API key can retrieve data
+- missing, disabled, or invalid API key requests cannot
 - output shape is stable and documented
 
 ---
 
-## Task-010 — Add core endpoint: notify the phone
+## Task-009 — Add core endpoint: notify the phone
 **Recommended agent(s):** android-platform, api-server, qa
 
 ### Goal
@@ -251,7 +232,7 @@ Let the homelab send a user-visible notification to the phone.
 
 ---
 
-## Task-011 — Build the audit log path end to end
+## Task-010 — Build the audit log path end to end
 **Recommended agent(s):** security, android-platform
 
 ### Goal
@@ -263,32 +244,13 @@ Record what privileged actions happened and show them in-app.
 - in-app audit screen
 
 ### Acceptance criteria
-- each privileged action records client, capability, time, outcome
+- each privileged action records route or capability, time, caller context where available, and outcome
 - secrets are not logged
 - log viewer is usable enough for homelab debugging
 
 ---
 
-## Task-012 — Build client management UI
-**Recommended agent(s):** android-platform
-
-### Goal
-Let the user inspect and manage trusted homelab clients.
-
-### Deliverables
-- paired client list
-- client detail screen
-- capability grant editing
-- revoke action
-
-### Acceptance criteria
-- user can inspect and revoke clients
-- granted capabilities are visible
-- revoked clients lose access immediately or on next request
-
----
-
-## Task-013 — Deliver a reference homelab client
+## Task-011 — Deliver a reference homelab client
 **Recommended agent(s):** docs, api-server
 
 ### Goal
@@ -301,12 +263,12 @@ Provide at least one clean reference client for real homelab use.
 - usage examples for at least two endpoints
 
 ### Acceptance criteria
-- a user can pair and call the API from another device on the same Wi‑Fi
+- a user can configure the API key and call the API from another device on the same Wi‑Fi
 - auth flow matches the real product model
 
 ---
 
-## Task-014 — Expand into optional capabilities
+## Task-012 — Expand into optional capabilities
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -319,16 +281,16 @@ Add further capabilities only after the secure core works.
 - app-sandbox file exchange
 
 ### Acceptance criteria
-- each new capability has explicit UX, permission notes, policy mapping, and tests proportional to risk
+- each new capability has explicit UX, permission notes, API-key auth behavior, consent behavior where needed, and tests proportional to risk
 - Android limitations are documented where they affect behavior
 
 ---
 
-## Task-015 — Implement optional API: text-to-speech
+## Task-013 — Implement optional API: text-to-speech
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
-Let trusted clients request user-audible speech output on the phone.
+Let requests with a valid API key trigger user-audible speech output on the phone.
 
 ### Deliverables
 - TTS capability definition
@@ -339,7 +301,7 @@ Let trusted clients request user-audible speech output on the phone.
 - audit events and tests or manual verification notes
 
 ### Acceptance criteria
-- only authorized clients can trigger speech
+- only requests with a valid enabled API key can trigger speech
 - payload length and rate limits prevent obvious abuse
 - speech is user-audible and auditable, not hidden behavior
 - unsupported locale or TTS engine states return consistent API errors
@@ -349,11 +311,11 @@ Treat this as a user-visible action. Include controls or settings that let the p
 
 ---
 
-## Task-016 — Implement optional API: camera photo capture
+## Task-014 — Implement optional API: camera photo capture
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
-Let trusted clients request a still photo while preserving explicit consent and Android privacy expectations.
+Let requests with a valid API key request a still photo while preserving explicit consent and Android privacy expectations.
 
 ### Deliverables
 - camera capture capability definition
@@ -376,11 +338,11 @@ Prefer a foreground, user-visible capture flow. Do not use hidden APIs, accessib
 
 ---
 
-## Task-017 — Implement optional API: audio recording
+## Task-015 — Implement optional API: audio recording
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
-Let trusted clients request bounded audio recordings with explicit user awareness and revocable policy controls.
+Let requests with a valid API key request bounded audio recordings with explicit user awareness and revocable controls.
 
 ### Deliverables
 - audio recording capability definition
@@ -399,15 +361,15 @@ Let trusted clients request bounded audio recordings with explicit user awarenes
 - start, stop, denial, timeout, and failure cases are audited without logging sensitive audio contents
 
 ### Codex prompt hint
-Model this as a high-risk capability. Require strong policy checks, visible recording state, and clear user controls before exposing it to clients.
+Model this as a high-risk capability. Require strong API-key checks, visible recording state, and clear user controls before exposing it.
 
 ---
 
-## Task-018 — Implement optional API: SMS send
+## Task-016 — Implement optional API: SMS send
 **Recommended agent(s):** android-platform, api-server, security, qa, docs
 
 ### Goal
-Let trusted clients request SMS delivery to explicit recipient numbers while preserving phone-side consent, carrier cost awareness, and abuse controls.
+Let requests with a valid API key request SMS delivery to explicit recipient numbers while preserving phone-side consent, carrier cost awareness, and abuse controls.
 
 ### Deliverables
 - SMS send capability definition
@@ -419,7 +381,7 @@ Let trusted clients request SMS delivery to explicit recipient numbers while pre
 - audit events and tests or manual verification notes
 
 ### Acceptance criteria
-- SMS sending cannot occur without Android SMS permission, explicit phone-side approval, and an authorized client grant
+- SMS sending cannot occur without Android SMS permission, explicit phone-side approval, and a valid enabled API key
 - recipients must be explicit and validated; address book expansion or unrestricted contact access is not introduced
 - message length, recipient count, frequency, and retry behavior are bounded to limit spam and accidental carrier charges
 - SIM slot selection is optional and degrades clearly on devices or Android versions where it is unavailable
@@ -427,11 +389,11 @@ Let trusted clients request SMS delivery to explicit recipient numbers while pre
 - audit records include client, capability, recipient count, time, and outcome, but do not log full message contents by default
 
 ### Codex prompt hint
-Model this as a high-risk capability. Follow `termux-sms-send` for the command shape, but add stronger LAN API safeguards: per-client grants, on-device approval, rate limits, idempotency, and careful audit logging.
+Model this as a high-risk capability. Follow `termux-sms-send` for the command shape, but add stronger LAN API safeguards: API-key auth, on-device approval, rate limits, idempotency, and careful audit logging.
 
 ---
 
-## Task-019 — Add open source license and project metadata
+## Task-017 — Add open source license and project metadata
 **Recommended agent(s):** docs, security
 
 ### Goal
@@ -455,7 +417,7 @@ If no license has been chosen yet, propose a short tradeoff between Apache-2.0, 
 
 ---
 
-## Task-020 — Create GitHub CI pipeline
+## Task-018 — Create GitHub CI pipeline
 **Recommended agent(s):** qa, android-platform, docs
 
 ### Goal
@@ -482,7 +444,7 @@ Keep CI separate from release publishing. Use the repository's Gradle wrapper on
 
 ---
 
-## Task-021 — Create semantic-versioned Android release pipeline
+## Task-019 — Create semantic-versioned Android release pipeline
 **Recommended agent(s):** android-platform, qa, security, docs
 
 ### Goal
@@ -512,7 +474,7 @@ Do not store Android signing keys in git. Document the required GitHub secrets a
 
 ---
 
-## Task-022 — Hardening and release-readiness pass
+## Task-020 — Hardening and release-readiness pass
 **Recommended agent(s):** security, qa, docs
 
 ### Goal
@@ -543,14 +505,13 @@ Prepare the homelab project for real personal use.
 5. Task-006
 6. Task-007
 7. Task-008 and Task-009
-8. Task-010 and Task-011
-9. Task-012
-10. Task-013
-11. Task-014
-12. Task-015, Task-016, Task-017, and Task-018
-13. Task-019 and Task-020
-14. Task-021
-15. Task-022
+8. Task-010
+9. Task-011
+10. Task-012
+11. Task-013, Task-014, Task-015, and Task-016
+12. Task-017 and Task-018
+13. Task-019
+14. Task-020
 
 ---
 

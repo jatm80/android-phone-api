@@ -3,7 +3,11 @@ x-android-service: &android-service
   build:
     context: .
     dockerfile: Dockerfile
+    args:
+      UID: ${DOCKER_UID:-1000}
+      GID: ${DOCKER_GID:-1000}
   working_dir: /workspace
+  user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
   volumes:
     - .:/workspace
     - gradle-cache:/home/android/.gradle
