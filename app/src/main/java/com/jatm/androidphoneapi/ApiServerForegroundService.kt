@@ -11,7 +11,9 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.jatm.androidphoneapi.capabilities.AndroidBatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.AndroidClipboardProvider
 import com.jatm.androidphoneapi.capabilities.AndroidDeviceInfoProvider
+import com.jatm.androidphoneapi.capabilities.AndroidLocationProvider
 import com.jatm.androidphoneapi.capabilities.AndroidNotificationSender
 import com.jatm.androidphoneapi.server.ApiServer
 import com.jatm.androidphoneapi.server.ApiServerConfig
@@ -46,6 +48,8 @@ class ApiServerForegroundService : Service() {
                 batteryInfoProvider = AndroidBatteryInfoProvider(applicationContext),
                 deviceInfoProvider = AndroidDeviceInfoProvider(),
                 notificationSender = AndroidNotificationSender(applicationContext),
+                clipboardProvider = AndroidClipboardProvider(applicationContext),
+                locationProvider = AndroidLocationProvider(applicationContext),
                 auditLogger = AppGraph.auditRepository(applicationContext),
             ).also { it.start() }
             ServerLifecycleRepository.markRunning()

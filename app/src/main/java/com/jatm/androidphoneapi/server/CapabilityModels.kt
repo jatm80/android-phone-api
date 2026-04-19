@@ -44,3 +44,34 @@ data class SendNotificationResponse(
     val delivered: Boolean,
     val requestId: String,
 )
+
+@Serializable
+data class ClipboardReadResponse(
+    val text: String? = null,
+    val hasContent: Boolean,
+    val requestId: String,
+)
+
+@Serializable
+data class ClipboardWriteRequest(
+    val text: String,
+)
+
+@Serializable
+data class ClipboardWriteResponse(
+    val written: Boolean,
+    val requestId: String,
+)
+
+@Serializable
+data class LocationResponse(
+    val latitude: Double,
+    val longitude: Double,
+    val accuracy: Float? = null,
+    val altitude: Double? = null,
+    val bearing: Float? = null,
+    val speed: Float? = null,
+    val timestampEpochMillis: Long,
+    val provider: String? = null,
+    val requestId: String,
+)

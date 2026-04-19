@@ -4,7 +4,9 @@ import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import com.jatm.androidphoneapi.audit.ApiAuditLogger
 import com.jatm.androidphoneapi.audit.NoOpApiAuditLogger
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.ClipboardProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
+import com.jatm.androidphoneapi.capabilities.LocationProvider
 import com.jatm.androidphoneapi.capabilities.NotificationRequest
 import com.jatm.androidphoneapi.capabilities.NotificationSender
 import io.ktor.http.HttpStatusCode
@@ -39,6 +41,8 @@ fun Application.apiServerModule(
     batteryInfoProvider: BatteryInfoProvider? = null,
     deviceInfoProvider: DeviceInfoProvider? = null,
     notificationSender: NotificationSender? = null,
+    clipboardProvider: ClipboardProvider? = null,
+    locationProvider: LocationProvider? = null,
     auditLogger: ApiAuditLogger = NoOpApiAuditLogger,
 ) {
     install(ContentNegotiation) {
@@ -196,6 +200,94 @@ fun Application.apiServerModule(
                     ),
                 )
                 auditLogger.logAccess("NOTIFICATION_SENT", call.requestId(), call.request.path())
+            }
+
+            get("/clipboard") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@get
+                val provider = clipboardProvider
+                if (provider == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotImplemented,
+                        code = ApiErrorCodes.NOT_IMPLEMENTED,
+                        message = "Clipboard access is not available",
+                    )
+                    return@get
+                }
+                val content = provider.read()
+                call.respond(
+                    ClipboardReadResponse(
+                        text = content.text,
+                        hasContent = content.hasContent,
+                        requestId = call.requestId(),
+                    ),
+                )
+                auditLogger.logAccess("CLIPBOARD_READ", call.requestId(), call.request.path())
+            }
+
+            post("/clipboard") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@post
+                val provider = clipboardProvider
+                if (provider == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotImplemented,
+                        code = ApiErrorCodes.NOT_IMPLEMENTED,
+                        message = "Clipboard access is not available",
+                    )
+                    return@post
+                }
+                val request = call.receive<ClipboardWriteRequest>()
+                if (request.text.length > 10_000) {
+                    call.respondError(
+                        status = HttpStatusCode.BadRequest,
+                        code = ApiErrorCodes.INVALID_REQUEST,
+                        message = "text must be at most 10000 characters",
+                    )
+                    return@post
+                }
+                provider.write(request.text)
+                call.respond(
+                    ClipboardWriteResponse(
+                        written = true,
+                        requestId = call.requestId(),
+                    ),
+                )
+                auditLogger.logAccess("CLIPBOARD_WRITE", call.requestId(), call.request.path())
+            }
+
+            get("/location") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@get
+                val provider = locationProvider
+                if (provider == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotImplemented,
+                        code = ApiErrorCodes.NOT_IMPLEMENTED,
+                        message = "Location is not available",
+                    )
+                    return@get
+                }
+                val location = provider.lastKnownLocation()
+                if (location == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotFound,
+                        code = ApiErrorCodes.NOT_AVAILABLE,
+                        message = "Location not available",
+                    )
+                    return@get
+                }
+                call.respond(
+                    LocationResponse(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        accuracy = location.accuracy,
+                        altitude = location.altitude,
+                        bearing = location.bearing,
+                        speed = location.speed,
+                        timestampEpochMillis = location.timestampEpochMillis,
+                        provider = location.provider,
+                        requestId = call.requestId(),
+                    ),
+                )
+                auditLogger.logAccess("LOCATION_READ", call.requestId(), call.request.path())
             }
         }
 

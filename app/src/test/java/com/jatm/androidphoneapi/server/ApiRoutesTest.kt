@@ -5,8 +5,12 @@ import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import com.jatm.androidphoneapi.audit.ApiAuditLogger
 import com.jatm.androidphoneapi.capabilities.BatteryInfo
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
+import com.jatm.androidphoneapi.capabilities.ClipboardContent
+import com.jatm.androidphoneapi.capabilities.ClipboardProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfo
 import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
+import com.jatm.androidphoneapi.capabilities.LocationInfo
+import com.jatm.androidphoneapi.capabilities.LocationProvider
 import com.jatm.androidphoneapi.capabilities.NotificationRequest
 import com.jatm.androidphoneapi.capabilities.NotificationResult
 import com.jatm.androidphoneapi.capabilities.NotificationSender
@@ -521,5 +525,239 @@ class ApiRoutesTest {
             lastRequest = request
             return result
         }
+    }
+
+    private class FakeClipboardProvider(
+        private val content: ClipboardContent = ClipboardContent(text = "hello", hasContent = true),
+    ) : ClipboardProvider {
+        var lastWritten: String? = null
+            private set
+
+        override fun read(): ClipboardContent = content
+        override fun write(text: String) {
+            lastWritten = text
+        }
+    }
+
+    private class FakeLocationProvider(
+        private val location: LocationInfo? = LocationInfo(
+            latitude = 37.7749,
+            longitude = -122.4194,
+            accuracy = 10.0f,
+            altitude = 16.0,
+            bearing = 90.0f,
+            speed = 1.5f,
+            timestampEpochMillis = 1_700_000_000_000L,
+            provider = "gps",
+        ),
+    ) : LocationProvider {
+        override fun lastKnownLocation(): LocationInfo? = location
+    }
+
+    // --- Clipboard tests ---
+
+    @Test
+    fun clipboardReadRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                clipboardProvider = FakeClipboardProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/clipboard") {
+            header(RequestIdHeader, "clip-unauth")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("clip-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun clipboardReadReturnsContent() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                clipboardProvider = FakeClipboardProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/clipboard") {
+            header(RequestIdHeader, "clip-read")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<ClipboardReadResponse>(response.bodyAsText())
+        assertEquals("hello", body.text)
+        assertTrue(body.hasContent)
+        assertEquals("clip-read", body.requestId)
+    }
+
+    @Test
+    fun clipboardWriteRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                clipboardProvider = FakeClipboardProvider(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/clipboard") {
+            header(RequestIdHeader, "clip-write-unauth")
+            contentType(ContentType.Application.Json)
+            setBody("""{"text":"hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("clip-write-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun clipboardWriteRejectsLongText() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                clipboardProvider = FakeClipboardProvider(),
+            )
+        }
+
+        val longText = "x".repeat(10_001)
+        val response = client.post("$ApiVersionPrefix/clipboard") {
+            header(RequestIdHeader, "clip-long")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"text":"$longText"}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("text"))
+    }
+
+    @Test
+    fun clipboardWriteSucceeds() = testApplication {
+        val fakeClipboard = FakeClipboardProvider()
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                clipboardProvider = fakeClipboard,
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/clipboard") {
+            header(RequestIdHeader, "clip-write-ok")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"text":"copied text"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<ClipboardWriteResponse>(response.bodyAsText())
+        assertTrue(body.written)
+        assertEquals("clip-write-ok", body.requestId)
+        assertEquals("copied text", fakeClipboard.lastWritten)
+    }
+
+    // --- Location tests ---
+
+    @Test
+    fun locationRequiresAuth() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                locationProvider = FakeLocationProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/location") {
+            header(RequestIdHeader, "loc-unauth")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("loc-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun locationReturnsData() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                locationProvider = FakeLocationProvider(),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/location") {
+            header(RequestIdHeader, "loc-ok")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<LocationResponse>(response.bodyAsText())
+        assertEquals(37.7749, body.latitude, 0.0001)
+        assertEquals(-122.4194, body.longitude, 0.0001)
+        assertEquals(10.0f, body.accuracy)
+        assertEquals(16.0, body.altitude)
+        assertEquals(90.0f, body.bearing)
+        assertEquals(1.5f, body.speed)
+        assertEquals(1_700_000_000_000L, body.timestampEpochMillis)
+        assertEquals("gps", body.provider)
+        assertEquals("loc-ok", body.requestId)
+    }
+
+    @Test
+    fun locationReturnsNotAvailableWhenNull() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                locationProvider = FakeLocationProvider(location = null),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/location") {
+            header(RequestIdHeader, "loc-null")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.NOT_AVAILABLE, body.error.code)
+        assertEquals("loc-null", body.error.requestId)
+    }
+
+    @Test
+    fun locationReturnsNotImplementedWhenProviderNull() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                locationProvider = null,
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/location") {
+            header(RequestIdHeader, "loc-not-impl")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.NOT_IMPLEMENTED, body.error.code)
+        assertEquals("loc-not-impl", body.error.requestId)
     }
 }
