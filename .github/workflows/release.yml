@@ -51,10 +51,11 @@ jobs:
         env:
           GRADLE_OPTS: "-Dorg.gradle.project.versionNameOverride=${{ steps.version.outputs.version }}"
 
-      - name: Generate checksums
+      - name: Rename and generate checksums
         run: |
           cd app/build/outputs/apk/release/
-          sha256sum *.apk > checksums-sha256.txt
+          mv *.apk android-phone-api.apk
+          sha256sum android-phone-api.apk > checksums-sha256.txt
           cat checksums-sha256.txt
 
       - name: Upload release artifacts

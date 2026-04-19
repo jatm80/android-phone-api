@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+base {
+    archivesName.set("android-phone-api")
+}
+
 android {
     namespace = "com.jatm.androidphoneapi"
     compileSdk = 36
@@ -33,6 +37,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
 }
 
 tasks.withType<JacocoReport>().configureEach {
