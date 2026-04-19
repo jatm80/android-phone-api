@@ -3,6 +3,8 @@ package com.jatm.androidphoneapi.server
 import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
+import com.jatm.androidphoneapi.capabilities.NotificationRequest
+import com.jatm.androidphoneapi.capabilities.NotificationSender
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -14,8 +16,10 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
@@ -32,6 +36,7 @@ fun Application.apiServerModule(
     apiKeyAuthenticator: ApiKeyAuthenticator = DisabledApiKeyAuthenticator(),
     batteryInfoProvider: BatteryInfoProvider? = null,
     deviceInfoProvider: DeviceInfoProvider? = null,
+    notificationSender: NotificationSender? = null,
 ) {
     install(ContentNegotiation) {
         json(
@@ -147,6 +152,44 @@ fun Application.apiServerModule(
                     ),
                 )
             }
+
+            post("/notify") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@post
+                val sender = notificationSender
+                if (sender == null) {
+                    call.respondError(
+                        status = HttpStatusCode.NotImplemented,
+                        code = ApiErrorCodes.NOT_IMPLEMENTED,
+                        message = "Notification sending is not available",
+                    )
+                    return@post
+                }
+                val request = call.receive<SendNotificationRequest>()
+                val errors = validateNotificationRequest(request)
+                if (errors.isNotEmpty()) {
+                    call.respondError(
+                        status = HttpStatusCode.BadRequest,
+                        code = ApiErrorCodes.INVALID_REQUEST,
+                        message = errors.joinToString("; "),
+                    )
+                    return@post
+                }
+                val result = sender.send(
+                    NotificationRequest(
+                        title = request.title,
+                        body = request.body,
+                        channel = request.channel,
+                        priority = request.priority,
+                    ),
+                )
+                call.respond(
+                    SendNotificationResponse(
+                        notificationId = result.notificationId,
+                        delivered = result.delivered,
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
         }
 
         get("{...}") {
@@ -157,6 +200,23 @@ fun Application.apiServerModule(
             )
         }
     }
+}
+
+private val channelPattern = Regex("[A-Za-z0-9_-]{1,64}")
+private val validPriorities = setOf("low", "default", "high")
+
+private fun validateNotificationRequest(request: SendNotificationRequest): List<String> {
+    val errors = mutableListOf<String>()
+    if (request.title.isBlank()) errors.add("title must not be blank")
+    if (request.title.length > 200) errors.add("title must be at most 200 characters")
+    if (request.body.length > 2000) errors.add("body must be at most 2000 characters")
+    if (!channelPattern.matches(request.channel)) {
+        errors.add("channel must be 1-64 alphanumeric, hyphen, or underscore characters")
+    }
+    if (request.priority !in validPriorities) {
+        errors.add("priority must be one of: low, default, high")
+    }
+    return errors
 }
 
 fun io.ktor.server.application.ApplicationCall.requestId(): String =

@@ -6,8 +6,15 @@ import com.jatm.androidphoneapi.capabilities.BatteryInfo
 import com.jatm.androidphoneapi.capabilities.BatteryInfoProvider
 import com.jatm.androidphoneapi.capabilities.DeviceInfo
 import com.jatm.androidphoneapi.capabilities.DeviceInfoProvider
+import com.jatm.androidphoneapi.capabilities.NotificationRequest
+import com.jatm.androidphoneapi.capabilities.NotificationResult
+import com.jatm.androidphoneapi.capabilities.NotificationSender
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
@@ -296,6 +303,129 @@ class ApiRoutesTest {
         assertEquals("dev-null", body.error.requestId)
     }
 
+    @Test
+    fun notifyEndpointRequiresAuthentication() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+                notificationSender = FakeNotificationSender(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/notify") {
+            header(RequestIdHeader, "notify-unauth")
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"Test","body":"Hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("notify-unauth", body.error.requestId)
+    }
+
+    @Test
+    fun notifyEndpointReturnsNotImplementedWhenSenderNull() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                notificationSender = null,
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/notify") {
+            header(RequestIdHeader, "notify-null")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"Test","body":"Hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.NOT_IMPLEMENTED, body.error.code)
+        assertEquals("notify-null", body.error.requestId)
+    }
+
+    @Test
+    fun notifyEndpointSendsNotificationForValidPayload() = testApplication {
+        val fakeSender = FakeNotificationSender()
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                notificationSender = fakeSender,
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/notify") {
+            header(RequestIdHeader, "notify-ok")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"Test Title","body":"Hello World","channel":"homelab","priority":"high"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<SendNotificationResponse>(response.bodyAsText())
+        assertEquals(42, body.notificationId)
+        assertTrue(body.delivered)
+        assertEquals("notify-ok", body.requestId)
+
+        val sent = fakeSender.lastRequest
+        assertEquals("Test Title", sent?.title)
+        assertEquals("Hello World", sent?.body)
+        assertEquals("homelab", sent?.channel)
+        assertEquals("high", sent?.priority)
+    }
+
+    @Test
+    fun notifyEndpointRejectsEmptyTitle() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                notificationSender = FakeNotificationSender(),
+            )
+        }
+
+        val response = client.post("$ApiVersionPrefix/notify") {
+            header(RequestIdHeader, "notify-empty-title")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"  ","body":"Hello"}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("title"))
+    }
+
+    @Test
+    fun notifyEndpointRejectsTooLongBody() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+                notificationSender = FakeNotificationSender(),
+            )
+        }
+
+        val longBody = "x".repeat(2001)
+        val response = client.post("$ApiVersionPrefix/notify") {
+            header(RequestIdHeader, "notify-long-body")
+            header("Authorization", "Bearer apa_live_test")
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"Valid","body":"$longBody"}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.INVALID_REQUEST, body.error.code)
+        assertTrue(body.error.message.contains("body"))
+    }
+
     private class FakeApiKeyAuthenticator(
         private val result: ApiKeyAuthResult,
     ) : ApiKeyAuthenticator {
@@ -336,5 +466,20 @@ class ApiRoutesTest {
         ),
     ) : DeviceInfoProvider {
         override fun deviceInfo(): DeviceInfo = info
+    }
+
+    private class FakeNotificationSender(
+        private val result: NotificationResult = NotificationResult(
+            notificationId = 42,
+            delivered = true,
+        ),
+    ) : NotificationSender {
+        var lastRequest: NotificationRequest? = null
+            private set
+
+        override fun send(request: NotificationRequest): NotificationResult {
+            lastRequest = request
+            return result
+        }
     }
 }

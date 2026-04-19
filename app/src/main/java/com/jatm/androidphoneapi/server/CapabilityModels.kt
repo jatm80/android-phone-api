@@ -29,3 +29,18 @@ data class DeviceInfoResponse(
     val uptimeMillis: Long,
     val requestId: String,
 )
+
+@Serializable
+data class SendNotificationRequest(
+    val title: String,
+    val body: String = "",
+    val channel: String = "homelab",
+    val priority: String = "default",
+)
+
+@Serializable
+data class SendNotificationResponse(
+    val notificationId: Int,
+    val delivered: Boolean,
+    val requestId: String,
+)
