@@ -99,7 +99,7 @@ Expected outputs:
 
 ### security
 Use for:
-- pairing
+- API-key authentication
 - authn/authz
 - key management
 - policy enforcement
@@ -140,7 +140,7 @@ Expected outputs:
 
 ## When to use subagents
 Use subagents for tasks that have natural separation. Examples:
-- ask **architect** for the design and **security** for the trust model before implementing pairing
+- ask **architect** for the design and **security** for the trust model before implementing API-key authentication
 - ask **android-platform** and **api-server** to split UI/service work from API work
 - ask **qa** to prepare or extend tests while implementation proceeds
 
@@ -155,11 +155,11 @@ Do not spawn many agents if the task is small enough for one coherent change.
 - Default to local-network only.
 - Default to deny-all capabilities until explicitly granted.
 - Require encrypted transport.
-- Prefer mTLS for trusted homelab clients unless the repo documents a different approved design.
-- If API keys are used, generate them randomly in-app, store them securely, allow phone-side enable/disable and reset, and never log or expose them except through an intentional user reveal action.
+- Use API-key authentication for the project trust model unless a future ADR explicitly reintroduces mTLS.
+- Generate API keys randomly in-app, store them securely, allow phone-side enable/disable and reset, and never log or expose them except through an intentional user reveal action.
 - Keep server private keys in Android Keystore where possible.
 - Log privileged actions, but never secrets.
-- Treat pairing as a privileged workflow requiring on-device approval.
+- Treat API key reveal, reset, and enable/disable actions as privileged workflows requiring intentional on-device user action.
 
 ### API rules
 - Version endpoints under a stable prefix.
@@ -194,12 +194,12 @@ Do not spawn many agents if the task is small enough for one coherent change.
 
 ---
 
-## MVP target
-Codex should optimize for a narrow, secure MVP before stretching into broader device control.
+## Project scope
+Codex should optimize for a small, secure homelab project before stretching into broader device control.
 
-### In scope for MVP
+### Core scope
 - embedded HTTPS server
-- client pairing and trust establishment
+- API-key authentication and phone-side controls
 - per-client capability grants
 - health endpoint
 - battery and device info endpoints
@@ -208,7 +208,7 @@ Codex should optimize for a narrow, secure MVP before stretching into broader de
 - simple client management UI
 - sample homelab client
 
-### Optional after MVP basics are stable
+### Optional after core basics are stable
 - clipboard read/write
 - media controls
 - location read
@@ -272,10 +272,10 @@ A task is done only when:
 1. threat model and capability matrix
 2. Docker development and CI baseline
 3. architecture and module layout
-4. pairing and auth design
+4. API-key auth design
 5. embedded server skeleton
 6. per-client policy enforcement
-7. first end-to-end MVP capability
+7. first end-to-end core capability
 8. audit logging and client management UI
 9. sample homelab client
 10. testing and hardening pass

@@ -11,12 +11,12 @@ Produce the minimum design artifacts Codex needs before implementation begins.
 
 ### Deliverables
 - capability matrix
-- MVP scope
+- initial project scope
 - trust boundaries
 - short ADRs for server stack and auth model
 
 ### Acceptance criteria
-- every candidate capability is marked as MVP, later, rejected, or Android-constrained
+- every candidate capability is marked as core, later, rejected, or Android-constrained
 - trust assumptions for LAN clients are written down
 - one preferred auth model is selected
 
@@ -94,25 +94,28 @@ Stand up the local API with routing, middleware, and structured errors.
 
 ---
 
-## Task-004 — Implement pairing and client trust establishment
-**Recommended agent(s):** security, android-platform, api-server
+## Task-004 — Finalize API-key authentication model
+**Recommended agent(s):** security, architect, api-server
 
 ### Goal
-Allow a homelab client to enroll securely with explicit on-device approval.
+Document the API-key auth model as the project trust mechanism so the project no longer depends on mTLS pairing.
 
 ### Deliverables
-- pairing flow
-- trust material generation and storage
-- client registry model
-- revoke path
+- short auth ADR
+- request authentication header convention
+- API enabled/disabled behavior
+- API key reset and invalidation behavior
+- rate-limit and audit expectations for failed auth
+- migration note for removing existing pairing or mTLS code
 
 ### Acceptance criteria
-- pairing cannot complete without phone-side approval
-- trusted clients persist across app restarts
-- a client can be revoked cleanly
+- API key auth is explicitly selected as the project auth mechanism
+- mTLS pairing is marked out of scope unless a future design reintroduces it
+- API key handling rules match the phone-side controls task
+- security tradeoffs are documented, including local-network assumptions and key exposure risk
 
 ### Codex prompt hint
-Have security propose the flow first, then api-server and android-platform implement their halves.
+Keep HTTPS for transport security, but remove mTLS client-certificate pairing from the project auth path.
 
 ---
 
@@ -147,7 +150,33 @@ Keep the UI intentionally basic: one enabled/disabled control, one reset button,
 
 ---
 
-## Task-006 — Build capability policy enforcement
+## Task-006 — Clean up mTLS pairing code and docs
+**Recommended agent(s):** security, android-platform, api-server, qa, docs
+
+### Goal
+Remove mTLS client-certificate pairing code, models, storage, routes, docs, and tests now that API-key auth is the selected project trust mechanism.
+
+### Deliverables
+- removal of pairing domain code no longer needed for API-key auth
+- removal of mTLS client-auth middleware and certificate trust-store logic
+- cleanup of pairing storage, repositories, routes, screens, and docs
+- updated tests for API-key auth as the only project auth path
+- migration or data-clearing note for any persisted pairing state
+
+### Acceptance criteria
+- no production code path requires paired client certificates for project access
+- stale pairing models, repositories, endpoints, and UI entry points are removed or explicitly marked future-only
+- tests no longer expect mTLS pairing behavior
+- API-key authentication remains covered by unit or integration tests
+- docs and sample clients describe API-key auth instead of mTLS pairing
+- HTTPS transport remains required even though mTLS client auth is removed
+
+### Codex prompt hint
+Search for `pairing`, `mTLS`, `client certificate`, trust store, certificate fingerprint, and related storage before editing. Keep any reusable generic HTTPS server pieces that are still needed.
+
+---
+
+## Task-007 — Build capability policy enforcement
 **Recommended agent(s):** security, api-server
 
 ### Goal
@@ -166,7 +195,7 @@ Enforce per-client authorization on every privileged endpoint.
 
 ---
 
-## Task-007 — Persist secrets, clients, grants, and audit metadata
+## Task-008 — Persist secrets, clients, grants, and audit metadata
 **Recommended agent(s):** android-platform, security
 
 ### Goal
@@ -184,7 +213,7 @@ Store operational state safely.
 
 ---
 
-## Task-008 — Add MVP endpoint: battery and device info
+## Task-009 — Add core endpoint: battery and device info
 **Recommended agent(s):** android-platform, api-server
 
 ### Goal
@@ -203,7 +232,7 @@ Ship the first genuinely useful, low-risk API capability.
 
 ---
 
-## Task-009 — Add MVP endpoint: notify the phone
+## Task-010 — Add core endpoint: notify the phone
 **Recommended agent(s):** android-platform, api-server, qa
 
 ### Goal
@@ -222,7 +251,7 @@ Let the homelab send a user-visible notification to the phone.
 
 ---
 
-## Task-010 — Build the audit log path end to end
+## Task-011 — Build the audit log path end to end
 **Recommended agent(s):** security, android-platform
 
 ### Goal
@@ -236,11 +265,11 @@ Record what privileged actions happened and show them in-app.
 ### Acceptance criteria
 - each privileged action records client, capability, time, outcome
 - secrets are not logged
-- log viewer is usable enough for MVP debugging
+- log viewer is usable enough for homelab debugging
 
 ---
 
-## Task-011 — Build client management UI
+## Task-012 — Build client management UI
 **Recommended agent(s):** android-platform
 
 ### Goal
@@ -259,7 +288,7 @@ Let the user inspect and manage trusted homelab clients.
 
 ---
 
-## Task-012 — Deliver a reference homelab client
+## Task-013 — Deliver a reference homelab client
 **Recommended agent(s):** docs, api-server
 
 ### Goal
@@ -268,7 +297,7 @@ Provide at least one clean reference client for real homelab use.
 ### Deliverables
 - Python or Go sample client
 - example config
-- pairing instructions
+- API key setup instructions
 - usage examples for at least two endpoints
 
 ### Acceptance criteria
@@ -277,7 +306,7 @@ Provide at least one clean reference client for real homelab use.
 
 ---
 
-## Task-013 — Expand into optional MVP+ capabilities
+## Task-014 — Expand into optional capabilities
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -295,7 +324,7 @@ Add further capabilities only after the secure core works.
 
 ---
 
-## Task-014 — Implement optional API: text-to-speech
+## Task-015 — Implement optional API: text-to-speech
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -320,7 +349,7 @@ Treat this as a user-visible action. Include controls or settings that let the p
 
 ---
 
-## Task-015 — Implement optional API: camera photo capture
+## Task-016 — Implement optional API: camera photo capture
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -347,7 +376,7 @@ Prefer a foreground, user-visible capture flow. Do not use hidden APIs, accessib
 
 ---
 
-## Task-016 — Implement optional API: audio recording
+## Task-017 — Implement optional API: audio recording
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -374,7 +403,7 @@ Model this as a high-risk capability. Require strong policy checks, visible reco
 
 ---
 
-## Task-017 — Implement optional API: SMS send
+## Task-018 — Implement optional API: SMS send
 **Recommended agent(s):** android-platform, api-server, security, qa, docs
 
 ### Goal
@@ -402,7 +431,7 @@ Model this as a high-risk capability. Follow `termux-sms-send` for the command s
 
 ---
 
-## Task-018 — Add open source license and project metadata
+## Task-019 — Add open source license and project metadata
 **Recommended agent(s):** docs, security
 
 ### Goal
@@ -426,7 +455,7 @@ If no license has been chosen yet, propose a short tradeoff between Apache-2.0, 
 
 ---
 
-## Task-019 — Create GitHub CI pipeline
+## Task-020 — Create GitHub CI pipeline
 **Recommended agent(s):** qa, android-platform, docs
 
 ### Goal
@@ -453,7 +482,7 @@ Keep CI separate from release publishing. Use the repository's Gradle wrapper on
 
 ---
 
-## Task-020 — Create semantic-versioned Android release pipeline
+## Task-021 — Create semantic-versioned Android release pipeline
 **Recommended agent(s):** android-platform, qa, security, docs
 
 ### Goal
@@ -483,11 +512,11 @@ Do not store Android signing keys in git. Document the required GitHub secrets a
 
 ---
 
-## Task-021 — Hardening and release-readiness pass
+## Task-022 — Hardening and release-readiness pass
 **Recommended agent(s):** security, qa, docs
 
 ### Goal
-Prepare the MVP for real personal use.
+Prepare the homelab project for real personal use.
 
 ### Deliverables
 - security review delta
@@ -500,7 +529,7 @@ Prepare the MVP for real personal use.
 ### Acceptance criteria
 - critical issues are closed or explicitly documented
 - onboarding path is documented end to end
-- server, pairing, first endpoints, and audit path are all verified together
+- server, API-key auth, first endpoints, and audit path are all verified together
 - local Docker build, test, lint, and coverage commands are verified
 - CI, coverage enforcement, licensing, and release artifact generation are verified before publishing
 
@@ -517,12 +546,13 @@ Prepare the MVP for real personal use.
 8. Task-010 and Task-011
 9. Task-012
 10. Task-013
-11. Task-014, Task-015, Task-016, and Task-017
-12. Task-018 and Task-019
-13. Task-020
+11. Task-014
+12. Task-015, Task-016, Task-017, and Task-018
+13. Task-019 and Task-020
 14. Task-021
+15. Task-022
 
 ---
 
 ## Example top-level Codex task prompt for this repo
-Implement the next MVP task for the secure Android homelab API app. Read AGENTS.md first. Plan before coding. If the task crosses architecture and security concerns, use the appropriate subagents. Keep changes narrow, add tests where behavior changes, and include a short handoff summary with files changed, tests run, and any Android-specific limitations.
+Implement the next task for the secure Android homelab API app. Read AGENTS.md first. Plan before coding. If the task crosses architecture and security concerns, use the appropriate subagents. Keep changes narrow, add tests where behavior changes, and include a short handoff summary with files changed, tests run, and any Android-specific limitations.
