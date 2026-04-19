@@ -26,34 +26,53 @@ A Python reference client is available in [`sample-client/`](sample-client/READM
 
 ## Development Status
 
-The Android scaffold is intentionally narrow:
-- `:app` is a Kotlin/Compose Android application.
-- `MainActivity` shows local API server lifecycle state.
-- `ApiServerForegroundService` provides the foreground-service start/stop path.
-- The embedded Ktor skeleton exposes `GET /api/v1/health` with request IDs and structured errors.
-- API key authentication and phone-side API controls are available as early project scaffolding.
-- Device capabilities are not exposed yet.
+### Application
+- `:app` is a Kotlin/Compose Android application
+- `MainActivity` shows server lifecycle, API key controls, and audit log viewer
+- `ApiServerForegroundService` provides the foreground-service start/stop path
 
-API server behavior:
-- Release/default server config requires HTTPS and fails closed until TLS trust material is implemented.
-- Debug builds may use plaintext on `127.0.0.1:8080` only for local development.
-- Plaintext LAN exposure is not a production path.
-- API key authentication is the current auth path. Clients send `Authorization: Bearer <api-key>` to protected endpoints.
-- API key controls are phone-side only: enable/disable, reveal, and reset.
-- The API key verifier is salted and hashed; the revealable raw key is encrypted with an Android Keystore-backed AES/GCM key before persistence.
+### API Endpoints
+All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: Bearer <api-key>`.
 
-Tooling baseline:
-- Android Gradle Plugin 9.1.0
-- Gradle 9.3.1 expected by the selected Android Gradle Plugin
-- AGP built-in Kotlin support with Compose compiler plugin 2.3.20
-- Compose BOM 2026.02.01
-- Java 17 toolchain for Android builds
+| Endpoint | Method | Auth | Description |
+| --- | --- | --- | --- |
+| `/health` | GET | No | Server health and status |
+| `/auth/check` | GET | Yes | Verify API key authentication |
+| `/battery` | GET | Yes | Battery level, status, temperature |
+| `/device` | GET | Yes | Device manufacturer, model, Android version |
+| `/notify` | POST | Yes | Send user-visible notification |
+| `/clipboard` | GET | Yes | Read clipboard content |
+| `/clipboard` | POST | Yes | Write text to clipboard |
+| `/location` | GET | Yes | Last known GPS/network location |
+| `/tts/speak` | POST | Yes | Text-to-speech playback |
+| `/tts/engines` | GET | Yes | List available TTS engines |
+| `/camera/list` | GET | Yes | List available cameras |
+| `/camera/capture` | POST | Yes | Capture photo (requires foreground UI) |
+| `/audio/record` | POST | Yes | Record audio (requires permission) |
+| `/sms/send` | POST | Yes | Send SMS (requires permission and approval) |
 
-Android assumptions:
-- The active server lifecycle uses a foreground service with `dataSync` type until the concrete server transport is implemented and validated.
-- Notification permission handling is not implemented yet; the current scaffold only declares the permission needed by modern Android notification behavior.
-- mTLS client-certificate pairing code has been removed. The shared API key is the sole authentication mechanism. mTLS may be reconsidered in a future ADR if the project outgrows the shared key model.
-- Unit coverage is below the repository target while the app consists mostly of Android UI and foreground-service scaffolding; instrumentation coverage should be added as lifecycle and UI behavior hardens.
+### Security
+- API key authentication with salted SHA-256 hash verification
+- Raw API key encrypted with Android Keystore-backed AES/GCM
+- All privileged actions audited (never logging secrets)
+- HTTPS required in production; plaintext only in debug on loopback
+- Phone-side controls: enable/disable, reveal, reset
+
+### Known Limitations
+- Camera capture and audio recording return stub responses pending foreground UI consent flow
+- SMS sending returns stub response pending SEND_SMS permission and on-device approval flow
+- Clipboard read may be restricted on Android 10+ when app is in background
+- Location requires ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION permission grant
+- TTS initialization is async and may briefly return "not ready" on first request
+- HTTPS/TLS transport not yet configured (production blocks until TLS material is available)
+- Coverage is below 90% target due to Android UI and service code requiring instrumentation tests
+- No rate limiting implemented yet for authenticated endpoints
+
+### Tooling
+- Android Gradle Plugin 9.1.0 / Gradle 9.3.1
+- Compose BOM 2026.02.01 / Kotlin 2.3.20
+- Java 17 toolchain
+- Docker-based development and CI
 
 ## License
 
