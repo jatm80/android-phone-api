@@ -1,20 +1,21 @@
 # Initial Design Pack
 
 ## Status
-Accepted for MVP planning.
+Accepted for small homelab project planning.
 
 ## Context
 This project is an Android app that exposes a secure API to trusted homelab systems on the local network. The app must assume no root access, no hidden Android APIs, explicit user consent, least privilege, and auditable privileged actions.
 
 The repository is starting from documentation only. This design pack defines the minimum direction needed before scaffolding the Android app, Docker workflow, API server, and trust model.
 
-## MVP Scope
-The MVP should prove a secure, user-controlled local API path before adding broader device capabilities.
+## Initial Scope
+The initial scope should keep the project small while proving a secure, user-controlled local API path before adding broader device capabilities.
 
-MVP includes:
+Core project scope includes:
 - Android app shell with a home or settings screen showing server state.
 - Foreground service lifecycle for the API server when actively running.
 - Embedded HTTPS API server.
+- Phone-generated API key authentication with enable, disable, reset, and intentional reveal controls.
 - Pairing and trust establishment with explicit phone-side approval.
 - Per-client capability grants, denied by default.
 - Health endpoint.
@@ -43,14 +44,14 @@ Rejected unless explicitly approved:
 ## Capability Matrix
 | Capability | Classification | Notes |
 | --- | --- | --- |
-| Health/status | MVP | Low sensitivity. Keep output minimal and versioned. Default to authenticated unless a deliberately public readiness endpoint is documented. |
-| Battery info | MVP | Low to moderate sensitivity. Requires trusted client authentication and a capability grant. |
-| Device info | MVP | Moderate fingerprinting risk. Avoid serials, IMEI, advertising IDs, account data, and other stable unique identifiers. |
-| Send user-visible notification | MVP | Abuse and spam risk. Requires authentication, authorization, payload limits, rate limits, audit logging, and Android notification permission on modern Android. |
-| Audit log viewer | MVP | Phone-side UI by default. Remote audit access is a separate later capability. |
-| Client management UI | MVP | Phone-side privileged UI. No remote grant or revoke path until explicitly designed. |
-| Pairing/trust establishment | MVP | Privileged workflow. Must require explicit on-device approval. |
-| Per-client capability grants | MVP | Deny by default. Required before meaningful privileged endpoints. |
+| Health/status | Core | Low sensitivity. Keep output minimal and versioned. Default to authenticated unless a deliberately public readiness endpoint is documented. |
+| Battery info | Core | Low to moderate sensitivity. Requires trusted client authentication and a capability grant. |
+| Device info | Core | Moderate fingerprinting risk. Avoid serials, IMEI, advertising IDs, account data, and other stable unique identifiers. |
+| Send user-visible notification | Core | Abuse and spam risk. Requires authentication, authorization, payload limits, rate limits, audit logging, and Android notification permission on modern Android. |
+| Audit log viewer | Core | Phone-side UI by default. Remote audit access is a separate later capability. |
+| Client management UI | Core | Phone-side privileged UI. No remote grant or revoke path until explicitly designed. |
+| API-key authentication | Core | Privileged phone-side controls for enable, disable, reveal, and reset. |
+| Per-client capability grants | Core | Deny by default. Required before meaningful privileged endpoints. |
 | Clipboard read/write | Android-constrained/later | Modern Android restricts background clipboard access and may show privacy indicators. Requires version-specific documentation. |
 | Media controls | Android-constrained/later | Feasibility depends on media session APIs and active sessions. Do not use unsupported control workarounds. |
 | Location read | Later | Sensitive. Requires just-in-time permission, clear UI disclosure, capability grant, and audit logging. |
@@ -58,7 +59,7 @@ Rejected unless explicitly approved:
 | mDNS discovery | Later | Convenience only. Must not imply trust or advertise secrets. |
 | Root features | Rejected | Violates product constraints. |
 | Silent surveillance | Rejected | Includes stealth location, background camera/microphone, or hidden monitoring. |
-| Unrestricted contacts/calendar access | Rejected unless explicitly approved | High sensitivity and outside MVP. |
+| Unrestricted contacts/calendar access | Rejected unless explicitly approved | High sensitivity and outside the project boundary. |
 | SMS/call control | Rejected unless explicitly approved | High abuse risk and platform-policy complexity. |
 | Background camera/microphone streaming | Rejected | Explicitly outside the product boundary. |
 | Accessibility-service automation shortcut | Rejected | Must not be used to bypass unsupported APIs. |
@@ -144,26 +145,28 @@ Alternatives considered:
 - Raw sockets: too much custom security-sensitive code.
 
 ## ADR-0002: Auth Model
-Decision: prefer mTLS with per-client certificates established through explicit phone-side pairing.
+Decision: use phone-generated API keys as the current authentication model.
 
 Model:
-- On setup, the app generates or provisions server TLS trust material and keeps private key access Android-appropriate, preferring Keystore-backed material where feasible.
-- Pairing creates or approves a stable client identity and binds it to a client certificate or public key.
-- Normal API requests require TLS and trusted client certificate authentication.
-- Authorization is enforced by client ID and capability grants.
-- Revocation is checked by app policy on every request, even if TLS accepts a certificate chain.
+- On first launch or first API settings load, the app creates a strong random API key inside the phone app.
+- The API key can be enabled, disabled, reset, and intentionally revealed from the phone UI.
+- Normal API requests require the configured API key, sent only over the HTTPS production transport path.
+- The server stores API-key material using Android-appropriate protected storage, preferring Keystore-backed encryption for recoverable secret material and constant-time hash comparison for request authentication.
+- Resetting the key immediately invalidates the previous key.
+- Disabling the API denies authenticated access without deleting the key.
+- Authorization is enforced by client identity and capability grants once the policy engine is implemented.
 
 Rationale:
-- Aligns with the repository security rule to prefer mTLS.
+- Matches the Task-005 direction and gives homelab clients a practical auth path.
 - Avoids trusting LAN location.
-- Gives stable client identity independent of IP address.
-- Supports per-client grants, revocation, and audit records.
-- Reduces reliance on long-lived bearer secrets.
+- Keeps the phone user in control of API enablement and credential rotation.
+- Allows tests and middleware to stabilize before adding higher-risk phone capabilities.
+- Keeps mTLS available as a future hardening path without blocking current project usability.
 
-API key compatibility:
-- `TASKS.md` includes a later task for API key generation and phone-side controls.
-- Treat API keys as an explicitly approved compatibility or transitional mode behind the same authentication and authorization middleware, not as the preferred long-term trust model.
-- API keys, if implemented, must be randomly generated in-app, securely stored, revealable only by intentional phone-side action, resettable, disableable, and never logged.
+mTLS hardening path:
+- mTLS with per-client certificates remains the preferred long-term transport identity model for higher assurance.
+- Later mTLS work should bind client certificates to the existing trusted-client records, preserve revocation semantics, and keep API keys as an optional compatibility mode if explicitly retained.
+- Public exposure through VPN, tunnels, or reverse proxies still requires separate review.
 
 ## Pairing Requirements
 - Pairing is disabled by default.
@@ -177,6 +180,7 @@ API key compatibility:
 - Version API endpoints under `/api/v1`.
 - Every privileged endpoint declares a named capability requirement.
 - Authentication and authorization are centralized in middleware or route wrappers.
+- Current authentication uses the API key. Requests present it with an explicit API-key header; secrets must never appear in URLs.
 - Errors use a consistent shape with a request ID.
 - Security failures avoid revealing whether a credential, client, or grant exists unless the user is viewing phone-side diagnostics.
 - Request outcomes are logged without secrets.
@@ -201,6 +205,10 @@ For notification, file, location, and similar endpoints, log metadata and outcom
 ## Hardening Checklist
 - Enforce HTTPS/mTLS by default.
 - Keep plaintext transport behind explicit debug/test gates only.
+- Generate API keys in-app with a cryptographically secure random source.
+- Store recoverable API-key material with Android-appropriate protection, preferring Keystore-backed encryption.
+- Store or compare authentication hashes using constant-time comparison.
+- Never log API keys or supplied credentials.
 - Deny all capabilities until granted to a trusted client.
 - Centralize authentication and authorization so endpoints cannot bypass checks.
 - Add rate limits for pairing, failed auth, notification sends, and future write-like endpoints.
@@ -215,12 +223,13 @@ For notification, file, location, and similar endpoints, log metadata and outcom
 2. Add Docker build, lint, test, and coverage workflows.
 3. Introduce core domain packages for capabilities, clients, audit events, and errors.
 4. Add Ktor server skeleton with `/api/v1`, request IDs, health, and structured errors.
-5. Implement pairing and mTLS trust establishment.
-6. Add deny-by-default policy enforcement and persistence.
-7. Ship authenticated battery and device info endpoints.
-8. Add validated user-visible notification endpoint.
-9. Build audit log and client management UI.
-10. Add sample homelab client and hardening checks.
+5. Implement pairing and client trust establishment.
+6. Add API key generation, phone-side controls, and authentication middleware.
+7. Add deny-by-default policy enforcement and persistence.
+8. Ship authenticated battery and device info endpoints.
+9. Add validated user-visible notification endpoint.
+10. Build audit log and client management UI.
+11. Add sample homelab client and hardening checks.
 
 ## Test Strategy
 This design task is documentation-only, so no tests are required.
@@ -238,4 +247,3 @@ Android instrumentation should cover:
 - Permission-state behavior.
 - Notification delivery.
 - UI flows for pairing, API controls, grants, audit, and revocation.
-

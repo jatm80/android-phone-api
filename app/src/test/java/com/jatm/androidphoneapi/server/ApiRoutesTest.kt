@@ -1,5 +1,7 @@
 package com.jatm.androidphoneapi.server
 
+import com.jatm.androidphoneapi.apikey.ApiKeyAuthResult
+import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import com.jatm.androidphoneapi.pairing.CreatePairingResponse
 import com.jatm.androidphoneapi.pairing.CreatePairingRequest
 import com.jatm.androidphoneapi.pairing.InMemoryPairingStore
@@ -197,6 +199,64 @@ class ApiRoutesTest {
         assertEquals("pairing-missing", body.error.requestId)
     }
 
+    @Test
+    fun protectedRouteRejectsMissingAuthorizationHeader() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.MissingOrInvalid),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/auth/check") {
+            header(RequestIdHeader, "auth-missing")
+        }
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertEquals("Bearer", response.headers["WWW-Authenticate"])
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.UNAUTHORIZED, body.error.code)
+        assertEquals("auth-missing", body.error.requestId)
+    }
+
+    @Test
+    fun protectedRouteRejectsDisabledApi() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Disabled),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/auth/check") {
+            header(RequestIdHeader, "auth-disabled")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.Forbidden, response.status)
+        val body = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+        assertEquals(ApiErrorCodes.API_DISABLED, body.error.code)
+        assertEquals("auth-disabled", body.error.requestId)
+    }
+
+    @Test
+    fun protectedRouteAllowsValidApiKey() = testApplication {
+        application {
+            apiServerModule(
+                timeProvider = TimeProvider { 123_456L },
+                apiKeyAuthenticator = FakeApiKeyAuthenticator(ApiKeyAuthResult.Authenticated),
+            )
+        }
+
+        val response = client.get("$ApiVersionPrefix/auth/check") {
+            header(RequestIdHeader, "auth-ok")
+            header("Authorization", "Bearer apa_live_test")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("authenticated"))
+    }
+
     private fun pairingRepository(
         ids: MutableList<String> = mutableListOf("pairing-1", "client-1"),
     ): PairingRepository =
@@ -206,4 +266,14 @@ class ApiRoutesTest {
             idGenerator = { ids.removeAt(0) },
             verificationCodeGenerator = { "123456" },
         )
+
+    private class FakeApiKeyAuthenticator(
+        private val result: ApiKeyAuthResult,
+    ) : ApiKeyAuthenticator {
+        override fun authenticate(
+            candidate: String?,
+            requestId: String?,
+            path: String?,
+        ): ApiKeyAuthResult = result
+    }
 }

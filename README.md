@@ -27,7 +27,8 @@ The Android scaffold is intentionally narrow:
 - `MainActivity` shows local API server lifecycle state.
 - `ApiServerForegroundService` provides the foreground-service start/stop path.
 - The embedded Ktor skeleton exposes `GET /api/v1/health` with request IDs and structured errors.
-- Pairing flow, trusted clients, capability policy, and device capabilities are not exposed yet.
+- Pairing flow, API key authentication, and trusted-client records are available as early project scaffolding.
+- Capability policy and device capabilities are not exposed yet.
 
 API server behavior:
 - Release/default server config requires HTTPS and fails closed until TLS trust material is implemented.
@@ -36,6 +37,9 @@ API server behavior:
 - Pairing clients can create and poll pending requests under `/api/v1/pairing/requests`.
 - Pairing approval, denial, and client revocation are phone-side actions only; no remote approval endpoint exists.
 - Pairing stores client public-key trust records in app-private SharedPreferences as interim persistence until the later structured storage task.
+- API key authentication is the current auth path. Clients send `Authorization: Bearer <api-key>` to protected endpoints.
+- API key controls are phone-side only: enable/disable, reveal, and reset.
+- The API key verifier is salted and hashed; the revealable raw key is encrypted with an Android Keystore-backed AES/GCM key before persistence.
 
 Tooling baseline:
 - Android Gradle Plugin 9.1.0
@@ -47,5 +51,6 @@ Tooling baseline:
 Android assumptions:
 - The active server lifecycle uses a foreground service with `dataSync` type until the concrete server transport is implemented and validated.
 - Notification permission handling is not implemented yet; the current scaffold only declares the permission needed by modern Android notification behavior.
-- Pairing trust records store public key material and fingerprints only; server private keys, mTLS material, grants, and secrets are intentionally not implemented yet.
+- Pairing trust records store public key material and fingerprints only; server private keys, mTLS material, and capability grants are intentionally not implemented yet.
+- mTLS remains a later hardening path; API keys are the current authentication mechanism.
 - Unit coverage is below the repository target while the app consists mostly of Android UI and foreground-service scaffolding; instrumentation coverage should be added as lifecycle and UI behavior hardens.

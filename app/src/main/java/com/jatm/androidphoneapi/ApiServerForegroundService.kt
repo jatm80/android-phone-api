@@ -39,6 +39,7 @@ class ApiServerForegroundService : Service() {
             apiServer = EmbeddedKtorApiServer(
                 config = ApiServerConfig.forBuild(BuildConfig.DEBUG),
                 logger = AndroidRequestOutcomeLogger,
+                apiKeyAuthenticator = AppGraph.apiKeyRepository(applicationContext),
                 pairingRepository = AppGraph.pairingRepository(applicationContext),
             ).also { it.start() }
             ServerLifecycleRepository.markRunning()

@@ -9,6 +9,7 @@ import com.jatm.androidphoneapi.pairing.PairingRepository
 import com.jatm.androidphoneapi.pairing.PairingStatusResponse
 import com.jatm.androidphoneapi.pairing.PairingValidationException
 import com.jatm.androidphoneapi.pairing.apiValue
+import com.jatm.androidphoneapi.apikey.ApiKeyAuthenticator
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -38,6 +39,7 @@ private val requestIdPattern = Regex("[A-Za-z0-9._-]{1,64}")
 fun Application.apiServerModule(
     timeProvider: TimeProvider = SystemTimeProvider,
     logger: RequestOutcomeLogger = NoOpRequestOutcomeLogger,
+    apiKeyAuthenticator: ApiKeyAuthenticator = DisabledApiKeyAuthenticator(),
     pairingRepository: PairingRepository = PairingRepository(
         store = InMemoryPairingStore(),
         timeProvider = timeProvider,
@@ -103,6 +105,12 @@ fun Application.apiServerModule(
                         requestId = call.requestId(),
                     ),
                 )
+            }
+
+            get("/auth/check") {
+                if (!call.requireApiKey(apiKeyAuthenticator)) return@get
+
+                call.respond(mapOf("status" to "authenticated"))
             }
 
             route("/pairing") {

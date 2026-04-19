@@ -27,8 +27,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.jatm.androidphoneapi.apikey.ApiKeyUiState
 import com.jatm.androidphoneapi.pairing.PairingRequestRecord
 import com.jatm.androidphoneapi.pairing.PairingState
 import com.jatm.androidphoneapi.pairing.TrustedClient
@@ -41,12 +43,17 @@ class MainActivity : ComponentActivity() {
             val pairingRepository = remember {
                 AppGraph.pairingRepository(applicationContext)
             }
+            val apiKeyRepository = remember {
+                AppGraph.apiKeyRepository(applicationContext)
+            }
             val lifecycleState by ServerLifecycleRepository.state.collectAsState()
             val pairingState by pairingRepository.state.collectAsState()
+            val apiKeyState by apiKeyRepository.state.collectAsState()
 
             AndroidPhoneApiApp(
                 lifecycleState = lifecycleState,
                 pairingState = pairingState,
+                apiKeyState = apiKeyState,
                 onStartServer = {
                     ContextCompat.startForegroundService(
                         this,
@@ -60,6 +67,9 @@ class MainActivity : ComponentActivity() {
                 onApprovePairing = pairingRepository::approvePairing,
                 onDenyPairing = pairingRepository::denyPairing,
                 onRevokeClient = pairingRepository::revokeClient,
+                onApiEnabledChange = apiKeyRepository::setEnabled,
+                onRevealApiKey = apiKeyRepository::presentKey,
+                onResetApiKey = apiKeyRepository::resetKey,
             )
         }
     }
@@ -69,11 +79,15 @@ class MainActivity : ComponentActivity() {
 fun AndroidPhoneApiApp(
     lifecycleState: ServerLifecycleState,
     pairingState: PairingState,
+    apiKeyState: ApiKeyUiState,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onApprovePairing: (String) -> Unit,
     onDenyPairing: (String) -> Unit,
     onRevokeClient: (String) -> Unit,
+    onApiEnabledChange: (Boolean) -> Unit,
+    onRevealApiKey: () -> Unit,
+    onResetApiKey: () -> Unit,
 ) {
     MaterialTheme {
         Surface(
@@ -83,11 +97,15 @@ fun AndroidPhoneApiApp(
             ServerHomeScreen(
                 lifecycleState = lifecycleState,
                 pairingState = pairingState,
+                apiKeyState = apiKeyState,
                 onStartServer = onStartServer,
                 onStopServer = onStopServer,
                 onApprovePairing = onApprovePairing,
                 onDenyPairing = onDenyPairing,
                 onRevokeClient = onRevokeClient,
+                onApiEnabledChange = onApiEnabledChange,
+                onRevealApiKey = onRevealApiKey,
+                onResetApiKey = onResetApiKey,
             )
         }
     }
@@ -97,11 +115,15 @@ fun AndroidPhoneApiApp(
 private fun ServerHomeScreen(
     lifecycleState: ServerLifecycleState,
     pairingState: PairingState,
+    apiKeyState: ApiKeyUiState,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onApprovePairing: (String) -> Unit,
     onDenyPairing: (String) -> Unit,
     onRevokeClient: (String) -> Unit,
+    onApiEnabledChange: (Boolean) -> Unit,
+    onRevealApiKey: () -> Unit,
+    onResetApiKey: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -177,6 +199,15 @@ private fun ServerHomeScreen(
 
         HorizontalDivider()
 
+        ApiKeyControlsSection(
+            apiKeyState = apiKeyState,
+            onApiEnabledChange = onApiEnabledChange,
+            onRevealApiKey = onRevealApiKey,
+            onResetApiKey = onResetApiKey,
+        )
+
+        HorizontalDivider()
+
         PairingRequestsSection(
             requests = pairingState.pendingRequests,
             onApprovePairing = onApprovePairing,
@@ -187,6 +218,60 @@ private fun ServerHomeScreen(
             clients = pairingState.trustedClients,
             onRevokeClient = onRevokeClient,
         )
+    }
+}
+
+@Composable
+private fun ApiKeyControlsSection(
+    apiKeyState: ApiKeyUiState,
+    onApiEnabledChange: (Boolean) -> Unit,
+    onRevealApiKey: () -> Unit,
+    onResetApiKey: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "API key",
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Enabled",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = if (apiKeyState.enabled) "Requests can authenticate" else "Requests are denied",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = apiKeyState.enabled,
+                onCheckedChange = onApiEnabledChange,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onRevealApiKey) {
+                Text("Reveal")
+            }
+            Button(onClick = onResetApiKey) {
+                Text("Reset")
+            }
+        }
+        apiKeyState.presentedKey?.let { key ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    modifier = Modifier.padding(16.dp),
+                    text = key,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        }
     }
 }
 
