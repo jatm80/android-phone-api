@@ -46,17 +46,77 @@ jobs:
       - name: Run tests
         run: docker compose run --rm test
 
-      - name: Build release APK
-        run: docker compose run --rm android assembleRelease
+      - name: Validate release signing secrets
         env:
-          GRADLE_OPTS: "-Dorg.gradle.project.versionNameOverride=${{ steps.version.outputs.version }}"
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            echo "Dry run requested; signing secrets are optional."
+            exit 0
+          fi
+
+          if [[ -z "${RELEASE_KEYSTORE_BASE64}" || -z "${RELEASE_KEYSTORE_PASSWORD}" || -z "${RELEASE_KEY_ALIAS}" || -z "${RELEASE_KEY_PASSWORD}" ]]; then
+            echo "::error::Release signing secrets are required for published APKs."
+            echo "::error::Configure RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD."
+            exit 1
+          fi
+
+      - name: Prepare release signing key
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -z "${RELEASE_KEYSTORE_BASE64}" ]]; then
+            echo "No signing key provided; continuing with unsigned dry-run build."
+            exit 0
+          fi
+
+          printf '%s' "${RELEASE_KEYSTORE_BASE64}" | base64 --decode > release-signing-key.jks
+          chmod 600 release-signing-key.jks
+
+      - name: Build release APK
+        env:
+          ANDROID_PHONE_API_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_PHONE_API_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          ANDROID_PHONE_API_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          SIGNING_ENV=()
+          if [[ -f release-signing-key.jks ]]; then
+            SIGNING_ENV+=(-e ANDROID_PHONE_API_RELEASE_STORE_FILE=/workspace/release-signing-key.jks)
+            SIGNING_ENV+=(-e ANDROID_PHONE_API_RELEASE_STORE_PASSWORD)
+            SIGNING_ENV+=(-e ANDROID_PHONE_API_RELEASE_KEY_ALIAS)
+            SIGNING_ENV+=(-e ANDROID_PHONE_API_RELEASE_KEY_PASSWORD)
+          fi
+
+          docker compose run --rm "${SIGNING_ENV[@]}" android assembleRelease -PversionNameOverride=${{ steps.version.outputs.version }}
+
+      - name: Verify release APK signature
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          APK_PATH="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+
+          if [[ -z "${APK_PATH}" ]]; then
+            echo "::error::No release APK was produced."
+            exit 1
+          fi
+
+          if [[ "${DRY_RUN}" == "true" && ! -f release-signing-key.jks ]]; then
+            echo "Skipping signature verification for unsigned dry-run APK: ${APK_PATH}"
+            exit 0
+          fi
+
+          docker compose run --rm --entrypoint /opt/android-sdk/build-tools/36.0.0/apksigner android verify --verbose "${APK_PATH}"
 
       - name: Rename and generate checksums
         run: |
-          cd app/build/outputs/apk/release/
-          mv *.apk android-phone-api.apk
-          sha256sum android-phone-api.apk > checksums-sha256.txt
-          cat checksums-sha256.txt
+          APK_PATH="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          mv "${APK_PATH}" app/build/outputs/apk/release/android-phone-api.apk
+          sha256sum app/build/outputs/apk/release/android-phone-api.apk > app/build/outputs/apk/release/checksums-sha256.txt
+          cat app/build/outputs/apk/release/checksums-sha256.txt
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

@@ -8,6 +8,18 @@ base {
     archivesName.set("android-phone-api")
 }
 
+val versionNameOverride = providers.gradleProperty("versionNameOverride")
+val releaseStoreFile = providers.environmentVariable("ANDROID_PHONE_API_RELEASE_STORE_FILE")
+val releaseStorePassword = providers.environmentVariable("ANDROID_PHONE_API_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = providers.environmentVariable("ANDROID_PHONE_API_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = providers.environmentVariable("ANDROID_PHONE_API_RELEASE_KEY_PASSWORD")
+val hasReleaseSigningConfig = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { it.isPresent }
+
 android {
     namespace = "com.jatm.androidphoneapi"
     compileSdk = 36
@@ -17,7 +29,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.1"
+        versionName = versionNameOverride.orElse("0.1.1").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -27,9 +39,26 @@ android {
         compose = true
     }
 
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            create("release") {
+                storeFile = file(releaseStoreFile.get())
+                storePassword = releaseStorePassword.get()
+                keyAlias = releaseKeyAlias.get()
+                keyPassword = releaseKeyPassword.get()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             enableUnitTestCoverage = true
+        }
+
+        release {
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
