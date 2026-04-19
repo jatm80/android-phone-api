@@ -6,6 +6,20 @@ Android app for exposing selected phone functions to trusted homelab systems thr
 
 - [Initial design pack](docs/design/initial-design-pack.md)
 
+## Docker Workflow
+
+Docker is the default development environment. See [Docker Development](docs/development/docker.md) for the full workflow.
+
+Common commands:
+
+```sh
+docker compose build android
+docker compose run --rm build
+docker compose run --rm lint
+docker compose run --rm test
+docker compose run --rm coverage
+```
+
 ## Development Status
 
 The Android scaffold is intentionally narrow:
@@ -17,7 +31,7 @@ The Android scaffold is intentionally narrow:
 Tooling baseline:
 - Android Gradle Plugin 9.1.0
 - Gradle 9.3.1 expected by the selected Android Gradle Plugin
-- Kotlin 2.3.20
+- AGP built-in Kotlin support with Compose compiler plugin 2.3.20
 - Compose BOM 2026.02.01
 - Java 17 toolchain for Android builds
 
