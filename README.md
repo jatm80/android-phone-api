@@ -33,6 +33,9 @@ API server behavior:
 - Release/default server config requires HTTPS and fails closed until TLS trust material is implemented.
 - Debug builds may use plaintext on `127.0.0.1:8080` only for local development.
 - Plaintext LAN exposure is not a production path.
+- Pairing clients can create and poll pending requests under `/api/v1/pairing/requests`.
+- Pairing approval, denial, and client revocation are phone-side actions only; no remote approval endpoint exists.
+- Pairing stores client public-key trust records in app-private SharedPreferences as interim persistence until the later structured storage task.
 
 Tooling baseline:
 - Android Gradle Plugin 9.1.0
@@ -44,5 +47,5 @@ Tooling baseline:
 Android assumptions:
 - The active server lifecycle uses a foreground service with `dataSync` type until the concrete server transport is implemented and validated.
 - Notification permission handling is not implemented yet; the current scaffold only declares the permission needed by modern Android notification behavior.
-- Pairing, mTLS, and capability routes are intentionally not implemented yet.
+- Pairing trust records store public key material and fingerprints only; server private keys, mTLS material, grants, and secrets are intentionally not implemented yet.
 - Unit coverage is below the repository target while the app consists mostly of Android UI and foreground-service scaffolding; instrumentation coverage should be added as lifecycle and UI behavior hardens.

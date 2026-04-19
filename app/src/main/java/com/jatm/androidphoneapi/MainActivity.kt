@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -20,20 +24,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.jatm.androidphoneapi.pairing.PairingRequestRecord
+import com.jatm.androidphoneapi.pairing.PairingState
+import com.jatm.androidphoneapi.pairing.TrustedClient
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
+            val pairingRepository = remember {
+                AppGraph.pairingRepository(applicationContext)
+            }
             val lifecycleState by ServerLifecycleRepository.state.collectAsState()
+            val pairingState by pairingRepository.state.collectAsState()
 
             AndroidPhoneApiApp(
                 lifecycleState = lifecycleState,
+                pairingState = pairingState,
                 onStartServer = {
                     ContextCompat.startForegroundService(
                         this,
@@ -44,6 +57,9 @@ class MainActivity : ComponentActivity() {
                     ServerLifecycleRepository.markStopping()
                     stopService(ApiServerForegroundService.stopIntent(this))
                 },
+                onApprovePairing = pairingRepository::approvePairing,
+                onDenyPairing = pairingRepository::denyPairing,
+                onRevokeClient = pairingRepository::revokeClient,
             )
         }
     }
@@ -52,8 +68,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AndroidPhoneApiApp(
     lifecycleState: ServerLifecycleState,
+    pairingState: PairingState,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
+    onApprovePairing: (String) -> Unit,
+    onDenyPairing: (String) -> Unit,
+    onRevokeClient: (String) -> Unit,
 ) {
     MaterialTheme {
         Surface(
@@ -62,8 +82,12 @@ fun AndroidPhoneApiApp(
         ) {
             ServerHomeScreen(
                 lifecycleState = lifecycleState,
+                pairingState = pairingState,
                 onStartServer = onStartServer,
                 onStopServer = onStopServer,
+                onApprovePairing = onApprovePairing,
+                onDenyPairing = onDenyPairing,
+                onRevokeClient = onRevokeClient,
             )
         }
     }
@@ -72,12 +96,17 @@ fun AndroidPhoneApiApp(
 @Composable
 private fun ServerHomeScreen(
     lifecycleState: ServerLifecycleState,
+    pairingState: PairingState,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
+    onApprovePairing: (String) -> Unit,
+    onDenyPairing: (String) -> Unit,
+    onRevokeClient: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
@@ -141,9 +170,118 @@ private fun ServerHomeScreen(
         }
 
         Text(
-            text = "No API routes are exposed yet. Server networking is added in a later task.",
+            text = "Health endpoint: /api/v1/health",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        HorizontalDivider()
+
+        PairingRequestsSection(
+            requests = pairingState.pendingRequests,
+            onApprovePairing = onApprovePairing,
+            onDenyPairing = onDenyPairing,
+        )
+
+        TrustedClientsSection(
+            clients = pairingState.trustedClients,
+            onRevokeClient = onRevokeClient,
+        )
     }
 }
+
+@Composable
+private fun PairingRequestsSection(
+    requests: List<PairingRequestRecord>,
+    onApprovePairing: (String) -> Unit,
+    onDenyPairing: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "Pending pairing",
+            style = MaterialTheme.typography.titleLarge,
+        )
+        if (requests.isEmpty()) {
+            Text(
+                text = "No pending requests",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        requests.forEach { request ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = request.displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Code ${request.verificationCode} · ${request.shortFingerprint()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = { onApprovePairing(request.id) }) {
+                            Text("Approve")
+                        }
+                        OutlinedButton(onClick = { onDenyPairing(request.id) }) {
+                            Text("Deny")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrustedClientsSection(
+    clients: List<TrustedClient>,
+    onRevokeClient: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "Trusted clients",
+            style = MaterialTheme.typography.titleLarge,
+        )
+        if (clients.isEmpty()) {
+            Text(
+                text = "No trusted clients",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        clients.forEach { client ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = client.displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "${if (client.isActive) "Active" else "Revoked"} · ${client.shortFingerprint()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (client.isActive) {
+                        OutlinedButton(onClick = { onRevokeClient(client.id) }) {
+                            Text("Revoke")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun PairingRequestRecord.shortFingerprint(): String =
+    publicKeyFingerprintSha256.take(23)
+
+private fun TrustedClient.shortFingerprint(): String =
+    publicKeyFingerprintSha256.take(23)
