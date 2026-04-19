@@ -20,6 +20,10 @@ docker compose run --rm test
 docker compose run --rm coverage
 ```
 
+## Sample Client
+
+A Python reference client is available in [`sample-client/`](sample-client/README.md). It provides a `PhoneApiClient` class and runnable examples for all current endpoints. See [sample-client/README.md](sample-client/README.md) for setup, usage, and curl examples.
+
 ## Development Status
 
 The Android scaffold is intentionally narrow:
