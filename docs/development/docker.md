@@ -54,5 +54,7 @@ docker compose run --rm shell
 
 Gradle dependencies are cached in the named Docker volume `gradle-cache`. Build outputs stay under normal Gradle `build/` directories, which are ignored by git.
 
+Gradle's project cache is also redirected into the container-owned Gradle cache volume with `org.gradle.projectcachedir=/home/android/.gradle/project-cache`. This avoids permission failures when CI bind-mounts the checked-out repository at `/workspace`.
+
 ## CI
 GitHub Actions uses the same Dockerfile and `docker compose` services as local development. Keep local and CI commands aligned when adding build, lint, test, or coverage steps.
