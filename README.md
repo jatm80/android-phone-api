@@ -26,7 +26,13 @@ The Android scaffold is intentionally narrow:
 - `:app` is a Kotlin/Compose Android application.
 - `MainActivity` shows local API server lifecycle state.
 - `ApiServerForegroundService` provides the foreground-service start/stop path.
-- No API sockets, routes, pairing flow, or capabilities are exposed yet.
+- The embedded Ktor skeleton exposes `GET /api/v1/health` with request IDs and structured errors.
+- Pairing flow, trusted clients, capability policy, and device capabilities are not exposed yet.
+
+API server behavior:
+- Release/default server config requires HTTPS and fails closed until TLS trust material is implemented.
+- Debug builds may use plaintext on `127.0.0.1:8080` only for local development.
+- Plaintext LAN exposure is not a production path.
 
 Tooling baseline:
 - Android Gradle Plugin 9.1.0
@@ -38,4 +44,5 @@ Tooling baseline:
 Android assumptions:
 - The active server lifecycle uses a foreground service with `dataSync` type until the concrete server transport is implemented and validated.
 - Notification permission handling is not implemented yet; the current scaffold only declares the permission needed by modern Android notification behavior.
-- The Docker build, lint, test, and coverage workflow is added in the next task.
+- Pairing, mTLS, and capability routes are intentionally not implemented yet.
+- Unit coverage is below the repository target while the app consists mostly of Android UI and foreground-service scaffolding; instrumentation coverage should be added as lifecycle and UI behavior hardens.

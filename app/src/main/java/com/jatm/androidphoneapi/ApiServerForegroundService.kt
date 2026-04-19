@@ -8,9 +8,18 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.jatm.androidphoneapi.server.ApiServer
+import com.jatm.androidphoneapi.server.ApiServerConfig
+import com.jatm.androidphoneapi.server.EmbeddedKtorApiServer
+import com.jatm.androidphoneapi.server.RequestOutcome
+import com.jatm.androidphoneapi.server.RequestOutcomeLogger
+import com.jatm.androidphoneapi.server.TlsConfigurationRequiredException
 
 class ApiServerForegroundService : Service() {
+    private var apiServer: ApiServer? = null
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -25,11 +34,30 @@ class ApiServerForegroundService : Service() {
 
         ServerLifecycleRepository.markStarting()
         startForeground(NOTIFICATION_ID, buildNotification())
-        ServerLifecycleRepository.markRunning()
-        return START_STICKY
+
+        return try {
+            apiServer = EmbeddedKtorApiServer(
+                config = ApiServerConfig.forBuild(BuildConfig.DEBUG),
+                logger = AndroidRequestOutcomeLogger,
+            ).also { it.start() }
+            ServerLifecycleRepository.markRunning()
+            START_STICKY
+        } catch (exception: TlsConfigurationRequiredException) {
+            Log.w(TAG, "API server refused to start without TLS configuration")
+            ServerLifecycleRepository.markStopped()
+            stopSelf(startId)
+            START_NOT_STICKY
+        } catch (exception: RuntimeException) {
+            Log.e(TAG, "API server failed to start: ${exception::class.simpleName}")
+            ServerLifecycleRepository.markStopped()
+            stopSelf(startId)
+            START_NOT_STICKY
+        }
     }
 
     override fun onDestroy() {
+        apiServer?.stop()
+        apiServer = null
         ServerLifecycleRepository.markStopped()
         super.onDestroy()
     }
@@ -65,6 +93,7 @@ class ApiServerForegroundService : Service() {
         const val ACTION_START = "com.jatm.androidphoneapi.action.START_SERVER"
         const val ACTION_STOP = "com.jatm.androidphoneapi.action.STOP_SERVER"
 
+        private const val TAG = "ApiServerService"
         private const val CHANNEL_ID = "api_server"
         private const val NOTIFICATION_ID = 1001
 
@@ -73,5 +102,15 @@ class ApiServerForegroundService : Service() {
 
         fun stopIntent(context: Context): Intent =
             Intent(context, ApiServerForegroundService::class.java).setAction(ACTION_STOP)
+    }
+}
+
+private object AndroidRequestOutcomeLogger : RequestOutcomeLogger {
+    override fun log(outcome: RequestOutcome) {
+        Log.i(
+            "ApiRequest",
+            "requestId=${outcome.requestId} method=${outcome.method} path=${outcome.path} " +
+                "status=${outcome.statusCode} failure=${outcome.failure ?: "none"}",
+        )
     }
 }
