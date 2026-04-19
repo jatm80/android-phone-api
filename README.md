@@ -54,3 +54,9 @@ Android assumptions:
 - Notification permission handling is not implemented yet; the current scaffold only declares the permission needed by modern Android notification behavior.
 - mTLS client-certificate pairing code has been removed. The shared API key is the sole authentication mechanism. mTLS may be reconsidered in a future ADR if the project outgrows the shared key model.
 - Unit coverage is below the repository target while the app consists mostly of Android UI and foreground-service scaffolding; instrumentation coverage should be added as lifecycle and UI behavior hardens.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+
+This project uses open source dependencies under their respective licenses. All current dependencies are Apache-2.0 compatible.
