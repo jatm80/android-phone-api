@@ -1,5 +1,6 @@
 package com.jatm.androidphoneapi.capabilities
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
 import android.location.LocationManager
@@ -7,6 +8,7 @@ import android.location.LocationManager
 class AndroidLocationProvider(
     private val context: Context,
 ) : LocationProvider {
+    @SuppressLint("MissingPermission")
     override fun lastKnownLocation(): LocationInfo? {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
