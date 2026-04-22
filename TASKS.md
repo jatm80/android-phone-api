@@ -4,6 +4,7 @@
 ## TASKS.md
 
 ## Task-000 — Create the initial design pack
+**Status:** done
 **Recommended agent(s):** architect, security
 
 ### Goal
@@ -26,6 +27,7 @@ Ask architect for the module plan and security for the threat model in parallel,
 ---
 
 ## Task-001 — Scaffold the Android project for server mode
+**Status:** done
 **Recommended agent(s):** android-platform
 
 ### Goal
@@ -48,6 +50,7 @@ Keep this task structural only. Do not add broad capability logic yet.
 ---
 
 ## Task-002 — Create Docker development environment
+**Status:** done
 **Recommended agent(s):** android-platform, qa, docs
 
 ### Goal
@@ -75,6 +78,7 @@ Prefer a practical Android SDK base image or a pinned custom image. Keep secrets
 ---
 
 ## Task-003 — Implement the embedded API server skeleton
+**Status:** done
 **Recommended agent(s):** api-server
 
 ### Goal
@@ -95,6 +99,7 @@ Stand up the local API with routing, middleware, and structured errors.
 ---
 
 ## Task-004 — Finalize API-key authentication model
+**Status:** done
 **Recommended agent(s):** security, architect, api-server
 
 ### Goal
@@ -120,6 +125,7 @@ Keep HTTPS for transport security, but remove mTLS client-certificate pairing fr
 ---
 
 ## Task-005 — Implement API key generation and phone-side controls
+**Status:** done
 **Recommended agent(s):** security, android-platform, api-server, qa
 
 ### Goal
@@ -151,6 +157,7 @@ Keep the UI intentionally basic: one enabled/disabled control, one reset button,
 ---
 
 ## Task-006 — Clean up mTLS pairing code and docs
+**Status:** done
 **Recommended agent(s):** security, android-platform, api-server, qa, docs
 
 ### Goal
@@ -177,6 +184,7 @@ Search for `pairing`, `mTLS`, `client certificate`, trust store, certificate fin
 ---
 
 ## Task-007 — Persist API secrets and audit metadata
+**Status:** done
 **Recommended agent(s):** android-platform, security
 
 ### Goal
@@ -195,6 +203,7 @@ Store operational state safely.
 ---
 
 ## Task-008 — Add core endpoint: battery and device info
+**Status:** done
 **Recommended agent(s):** android-platform, api-server
 
 ### Goal
@@ -214,6 +223,7 @@ Ship the first genuinely useful, low-risk API capability.
 ---
 
 ## Task-009 — Add core endpoint: notify the phone
+**Status:** done
 **Recommended agent(s):** android-platform, api-server, qa
 
 ### Goal
@@ -233,6 +243,7 @@ Let the homelab send a user-visible notification to the phone.
 ---
 
 ## Task-010 — Build the audit log path end to end
+**Status:** done
 **Recommended agent(s):** security, android-platform
 
 ### Goal
@@ -251,6 +262,7 @@ Record what privileged actions happened and show them in-app.
 ---
 
 ## Task-011 — Deliver a reference homelab client
+**Status:** done
 **Recommended agent(s):** docs, api-server
 
 ### Goal
@@ -269,6 +281,7 @@ Provide at least one clean reference client for real homelab use.
 ---
 
 ## Task-012 — Expand into optional capabilities
+**Status:** done
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -287,6 +300,7 @@ Add further capabilities only after the secure core works.
 ---
 
 ## Task-013 — Implement optional API: text-to-speech
+**Status:** done
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -312,6 +326,7 @@ Treat this as a user-visible action. Include controls or settings that let the p
 ---
 
 ## Task-014 — Implement optional API: camera photo capture
+**Status:** done
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -339,6 +354,7 @@ Prefer a foreground, user-visible capture flow. Do not use hidden APIs, accessib
 ---
 
 ## Task-015 — Implement optional API: audio recording
+**Status:** done
 **Recommended agent(s):** android-platform, api-server, security, qa
 
 ### Goal
@@ -366,6 +382,7 @@ Model this as a high-risk capability. Require strong API-key checks, visible rec
 ---
 
 ## Task-016 — Implement optional API: SMS send
+**Status:** done
 **Recommended agent(s):** android-platform, api-server, security, qa, docs
 
 ### Goal
@@ -394,6 +411,7 @@ Model this as a high-risk capability. Follow `termux-sms-send` for the command s
 ---
 
 ## Task-017 — Add open source license and project metadata
+**Status:** done
 **Recommended agent(s):** docs, security
 
 ### Goal
@@ -418,6 +436,7 @@ If no license has been chosen yet, propose a short tradeoff between Apache-2.0, 
 ---
 
 ## Task-018 — Create GitHub CI pipeline
+**Status:** done
 **Recommended agent(s):** qa, android-platform, docs
 
 ### Goal
@@ -445,6 +464,7 @@ Keep CI separate from release publishing. Use the repository's Gradle wrapper on
 ---
 
 ## Task-019 — Create semantic-versioned Android release pipeline
+**Status:** done
 **Recommended agent(s):** android-platform, qa, security, docs
 
 ### Goal
@@ -475,6 +495,7 @@ Do not store Android signing keys in git. Document the required GitHub secrets a
 ---
 
 ## Task-020 — Hardening and release-readiness pass
+**Status:** done
 **Recommended agent(s):** security, qa, docs
 
 ### Goal
@@ -497,6 +518,40 @@ Prepare the homelab project for real personal use.
 
 ---
 
+## Task-021 — Implement foreground UI for camera photo capture
+**Status:** to-do
+**Recommended agent(s):** android-platform, api-server, security, qa, docs
+
+### Goal
+Make `POST /api/v1/camera/capture` take a real still photo through a foreground, user-visible Android camera flow while preserving explicit consent and avoiding silent capture.
+
+### Deliverables
+- Android `CAMERA` permission and non-required camera feature declaration
+- CameraX dependency baseline and app-managed JPEG capture implementation
+- foreground capture Activity or Compose screen with preview, capture, cancel, and permission states
+- API-to-UI coordination layer for pending capture requests, user approval, cancellation, timeout, and result delivery
+- updated `CameraProvider` contract if capture must become suspendable
+- app-managed capture storage and metadata response mapping
+- audit events for request, approval, denial, cancellation, timeout, success, and failure
+- tests for route mapping, validation, coordinator outcomes, and permission/consent failure modes
+- README and sample-client notes documenting phone-side approval and Android permission behavior
+
+### Acceptance criteria
+- a valid enabled API key is required before any capture request is accepted
+- capture cannot occur unless the app is in a foreground, user-visible consent flow
+- first use requests Android camera permission just in time
+- the phone user can approve, cancel, or ignore a capture request
+- timed-out, cancelled, denied, invalid camera, unavailable camera, and failed capture states return consistent API responses
+- successful capture stores a JPEG only in app-managed or user-approved storage
+- API responses expose only capture metadata and approved retrieval paths, not arbitrary filesystem access
+- no hidden APIs, accessibility automation, silent surveillance behavior, or background camera streaming are introduced
+- privileged camera actions are audited without logging image contents or secrets
+
+### Codex prompt hint
+Prefer a waiting request with a short timeout for the first implementation unless an async result model is introduced deliberately. Be careful with Android background activity launch limits; a notification or in-app pending request UI may be needed to bring the phone user into the foreground flow reliably.
+
+---
+
 ## Suggested Codex execution order
 1. Task-000
 2. Task-001 and Task-002
@@ -512,6 +567,7 @@ Prepare the homelab project for real personal use.
 12. Task-017 and Task-018
 13. Task-019
 14. Task-020
+15. Task-021
 
 ---
 

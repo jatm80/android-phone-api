@@ -47,7 +47,7 @@ All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: B
 | `/tts/speak` | POST | Yes | Text-to-speech playback |
 | `/tts/engines` | GET | Yes | List available TTS engines |
 | `/camera/list` | GET | Yes | List available cameras |
-| `/camera/capture` | POST | Yes | Capture photo (requires foreground UI) |
+| `/camera/capture` | POST | Yes | Photo capture API stub; real foreground UI capture is not implemented yet |
 | `/audio/record` | POST | Yes | Record audio (requires permission) |
 | `/sms/send` | POST | Yes | Send SMS (requires permission and approval) |
 
@@ -59,7 +59,8 @@ All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: B
 - Phone-side controls: enable/disable, reveal, reset
 
 ### Known Limitations
-- Camera capture and audio recording return stub responses pending foreground UI consent flow
+- Camera capture is not implemented yet; `/camera/capture` currently returns a stub response until the foreground CameraX UI, permission, and consent flow are built
+- Audio recording returns a stub response pending foreground UI consent flow
 - SMS sending returns stub response pending SEND_SMS permission and on-device approval flow
 - Clipboard read may be restricted on Android 10+ when app is in background
 - Location requires ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION permission grant
