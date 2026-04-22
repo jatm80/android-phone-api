@@ -75,6 +75,15 @@ class PhoneApiClient:
         resp.raise_for_status()
         return resp.json()
 
+    def location(self) -> dict:
+        resp = self._session.get(
+            self._url("/location"),
+            headers={"X-Request-ID": self._request_id()},
+            timeout=self._config.timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def notify(self, title: str, body: str = "", channel: str = "homelab", priority: str = "default") -> dict:
         resp = self._session.post(
             self._url("/notify"),
