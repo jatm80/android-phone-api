@@ -91,6 +91,19 @@ class ApiKeyRepositoryTest {
     }
 
     @Test
+    fun togglePresentationRevealsThenHidesRawKey() {
+        val repository = repository()
+
+        repository.toggleKeyPresentation()
+
+        assertEquals("apa_live_test_1", repository.state.value.presentedKey)
+
+        repository.toggleKeyPresentation()
+
+        assertNull(repository.state.value.presentedKey)
+    }
+
+    @Test
     fun authFailureAuditDoesNotContainRawKey() {
         val auditEvents = mutableListOf<ApiKeyAuditEvent>()
         val repository = repository(auditEvents = auditEvents)

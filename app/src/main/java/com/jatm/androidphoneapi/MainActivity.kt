@@ -6,10 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.jatm.androidphoneapi.apikey.ApiKeyUiState
 import com.jatm.androidphoneapi.audit.AuditEvent
+import com.jatm.androidphoneapi.server.ApiServerConfig
+import com.jatm.androidphoneapi.server.ApiVersionPrefix
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.net.SocketException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,11 +50,13 @@ class MainActivity : ComponentActivity() {
             val lifecycleState by ServerLifecycleRepository.state.collectAsState()
             val apiKeyState by apiKeyRepository.state.collectAsState()
             val auditEvents by auditRepository.eventsFlow.collectAsState()
+            val apiBaseUrl = remember { apiBaseUrlForDisplay() }
 
             AndroidPhoneApiApp(
                 lifecycleState = lifecycleState,
                 apiKeyState = apiKeyState,
                 auditEvents = auditEvents,
+                apiBaseUrl = apiBaseUrl,
                 onStartServer = {
                     ContextCompat.startForegroundService(
                         this,
@@ -63,7 +68,7 @@ class MainActivity : ComponentActivity() {
                     stopService(ApiServerForegroundService.stopIntent(this))
                 },
                 onApiEnabledChange = apiKeyRepository::setEnabled,
-                onRevealApiKey = apiKeyRepository::presentKey,
+                onRevealApiKey = apiKeyRepository::toggleKeyPresentation,
                 onResetApiKey = apiKeyRepository::resetKey,
                 onClearAudit = auditRepository::clear,
             )
@@ -76,6 +81,7 @@ fun AndroidPhoneApiApp(
     lifecycleState: ServerLifecycleState,
     apiKeyState: ApiKeyUiState,
     auditEvents: List<AuditEvent>,
+    apiBaseUrl: String,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onApiEnabledChange: (Boolean) -> Unit,
@@ -92,6 +98,7 @@ fun AndroidPhoneApiApp(
                 lifecycleState = lifecycleState,
                 apiKeyState = apiKeyState,
                 auditEvents = auditEvents,
+                apiBaseUrl = apiBaseUrl,
                 onStartServer = onStartServer,
                 onStopServer = onStopServer,
                 onApiEnabledChange = onApiEnabledChange,
@@ -108,6 +115,7 @@ private fun ServerHomeScreen(
     lifecycleState: ServerLifecycleState,
     apiKeyState: ApiKeyUiState,
     auditEvents: List<AuditEvent>,
+    apiBaseUrl: String,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onApiEnabledChange: (Boolean) -> Unit,
@@ -164,28 +172,7 @@ private fun ServerHomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = onStartServer,
-                enabled = lifecycleState.canStart,
-            ) {
-                Text("Start")
-            }
-            OutlinedButton(
-                onClick = onStopServer,
-                enabled = lifecycleState.canStop,
-            ) {
-                Text("Stop")
-            }
-        }
-
-        Text(
-            text = "Health endpoint: /api/v1/health",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        ApiUrlSection(apiBaseUrl = apiBaseUrl)
 
         HorizontalDivider()
 
@@ -202,6 +189,33 @@ private fun ServerHomeScreen(
             events = auditEvents,
             onClearAudit = onClearAudit,
         )
+    }
+}
+
+@Composable
+private fun ApiUrlSection(apiBaseUrl: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Phone API URL",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = apiBaseUrl,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Text(
+                    text = "Health endpoint: $apiBaseUrl/health",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -240,7 +254,7 @@ private fun ApiKeyControlsSection(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onRevealApiKey) {
-                Text("Reveal")
+                Text(if (apiKeyState.presentedKey == null) "Reveal" else "Hide")
             }
             Button(onClick = onResetApiKey) {
                 Text("Reset")
@@ -319,3 +333,28 @@ private fun formatTimestamp(epochMillis: Long): String {
     val zoned = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
     return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(zoned)
 }
+
+internal fun apiBaseUrlForDisplay(
+    hostAddress: String? = findLocalIpv4Address(),
+    config: ApiServerConfig = ApiServerConfig.localNetworkHttp(),
+): String {
+    val host = hostAddress ?: "<phone ip>"
+    return "http://$host:${config.port}$ApiVersionPrefix"
+}
+
+private fun findLocalIpv4Address(): String? =
+    try {
+        NetworkInterface.getNetworkInterfaces()
+            .asSequence()
+            .filter { networkInterface ->
+                networkInterface.isUp && !networkInterface.isLoopback && !networkInterface.isVirtual
+            }
+            .flatMap { it.inetAddresses.asSequence() }
+            .filterIsInstance<Inet4Address>()
+            .firstOrNull { address ->
+                !address.isLoopbackAddress && !address.isLinkLocalAddress
+            }
+            ?.hostAddress
+    } catch (_: SocketException) {
+        null
+    }

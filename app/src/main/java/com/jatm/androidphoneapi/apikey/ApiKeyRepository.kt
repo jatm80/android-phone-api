@@ -88,6 +88,16 @@ class ApiKeyRepository(
     }
 
     @Synchronized
+    fun toggleKeyPresentation() {
+        val current = persistedState ?: createInitialKey()
+        if (mutableState.value.presentedKey != null) {
+            mutableState.value = current.toUiState(presentedKey = null)
+        } else {
+            presentKey()
+        }
+    }
+
+    @Synchronized
     override fun authenticate(
         candidate: String?,
         requestId: String?,
