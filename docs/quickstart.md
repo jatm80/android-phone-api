@@ -19,7 +19,7 @@ The debug APK is at `app/build/outputs/apk/debug/app-debug.apk`.
 1. Install the APK on your device
 2. Open "Android Phone API"
 3. Toggle the server switch to start the API server
-4. The server runs on port 8080 (debug) or 8443 (release)
+4. The server runs over HTTP on port 8080
 
 ## Configure API Key
 
@@ -65,8 +65,8 @@ docker compose run --rm coverage
 
 ## Security Notes
 
-- Debug builds use plaintext HTTP on loopback only
-- Production builds require HTTPS (not yet configured)
+- Debug and release builds use HTTP on port 8080 for trusted local-network access
+- API keys are sent over HTTP; use only on trusted Wi-Fi/VPN networks
 - API keys are generated on-device and stored encrypted
 - All authenticated actions are logged in the audit viewer
 - Never share your API key in logs, commits, or public channels

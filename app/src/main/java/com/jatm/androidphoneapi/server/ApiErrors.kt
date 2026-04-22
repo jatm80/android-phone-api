@@ -19,7 +19,6 @@ object ApiErrorCodes {
     const val INTERNAL_ERROR = "internal_error"
     const val INVALID_REQUEST = "invalid_request"
     const val NOT_FOUND = "not_found"
-    const val PLAINTEXT_DISABLED = "plaintext_disabled"
     const val NOT_AVAILABLE = "not_available"
     const val NOT_IMPLEMENTED = "not_implemented"
     const val UNAUTHORIZED = "unauthorized"

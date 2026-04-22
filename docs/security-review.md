@@ -16,10 +16,10 @@ Security posture review for homelab use of the Android Phone API.
 - ✅ API key never logged
 
 ## Transport
-- ✅ Production config requires HTTPS (fails closed)
-- ✅ Plaintext limited to debug builds on loopback only
-- ⚠️ TLS certificate provisioning not yet implemented
-- ⚠️ No certificate pinning
+- ✅ HTTP is intentionally enabled for trusted local-network use
+- ✅ Debug and release builds use the same explicit port, 8080
+- ⚠️ API keys travel in plaintext on the local network
+- ⚠️ No TLS encryption or certificate pinning
 
 ## Authorization
 - ✅ Single shared API key model (appropriate for homelab)
@@ -41,11 +41,12 @@ Security posture review for homelab use of the Android Phone API.
 
 ## Network Exposure
 - ✅ Default to local-network only
+- ⚠️ Server binds to all device interfaces; do not port-forward or expose beyond trusted Wi-Fi/VPN
 - ⚠️ No mDNS discovery (future candidate)
 - ⚠️ Port forwarding/VPN exposure requires separate review
 
 ## Known Gaps
-1. TLS certificate management not implemented
+1. Plaintext HTTP transport exposes API keys to local-network observers
 2. No rate limiting on API endpoints
 3. No per-capability enable/disable beyond global API toggle
 4. Camera capture requires foreground Activity (stub until implemented)
@@ -54,7 +55,7 @@ Security posture review for homelab use of the Android Phone API.
 7. Unit test coverage below 90% target (UI/service code needs instrumentation)
 
 ## Recommendations
-1. Implement TLS with self-signed certificate + fingerprint verification
+1. Add optional HTTPS later if the API is ever exposed outside a trusted LAN/VPN
 2. Add per-endpoint rate limiting
 3. Add per-capability toggle in settings
 4. Implement camera/audio consent UX before enabling those capabilities

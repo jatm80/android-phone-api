@@ -55,7 +55,7 @@ All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: B
 - API key authentication with salted SHA-256 hash verification
 - Raw API key encrypted with Android Keystore-backed AES/GCM
 - All privileged actions audited (never logging secrets)
-- HTTPS required in production; plaintext only in debug on loopback
+- HTTP is intentionally enabled for trusted local-network use on port 8080
 - Phone-side controls: enable/disable, reveal, reset
 
 ### Known Limitations
@@ -64,7 +64,7 @@ All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: B
 - Clipboard read may be restricted on Android 10+ when app is in background
 - Location requires ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION permission grant
 - TTS initialization is async and may briefly return "not ready" on first request
-- HTTPS/TLS transport not yet configured (production blocks until TLS material is available)
+- API keys travel over HTTP; use only on trusted Wi-Fi/VPN networks and avoid port forwarding
 - Coverage is below 90% target due to Android UI and service code requiring instrumentation tests
 - No rate limiting implemented yet for authenticated endpoints
 

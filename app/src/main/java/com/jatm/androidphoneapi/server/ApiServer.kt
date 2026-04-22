@@ -43,10 +43,6 @@ class EmbeddedKtorApiServer(
     override fun start() {
         if (engine != null) return
 
-        if (config.transportMode == TransportMode.HTTPS_REQUIRED) {
-            throw TlsConfigurationRequiredException()
-        }
-
         engine = embeddedServer(
             factory = CIO,
             host = config.bindHost,
@@ -78,7 +74,3 @@ class EmbeddedKtorApiServer(
         engine = null
     }
 }
-
-class TlsConfigurationRequiredException : IllegalStateException(
-    "HTTPS transport is required until an explicit debug plaintext mode is selected.",
-)

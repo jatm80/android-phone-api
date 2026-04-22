@@ -13,7 +13,7 @@ Reference Python client for the Android Phone API homelab server.
 cd sample-client
 pip install -r requirements.txt
 
-export PHONE_API_URL="http://127.0.0.1:8080"   # debug server
+export PHONE_API_URL="http://<phone-ip>:8080"
 export PHONE_API_KEY="your-api-key-here"
 
 python examples.py
@@ -23,7 +23,7 @@ python examples.py
 
 | Variable | Description | Default |
 |---|---|---|
-| `PHONE_API_URL` | Base URL of the phone API server | `https://phone.local:8443` |
+| `PHONE_API_URL` | Base URL of the phone API server | `http://phone.local:8080` |
 | `PHONE_API_KEY` | API key for authenticated endpoints (required) | — |
 
 ## Library Usage
@@ -36,9 +36,8 @@ config = PhoneApiConfig.from_env()
 
 # Or configure explicitly
 config = PhoneApiConfig(
-    base_url="http://127.0.0.1:8080",
+    base_url="http://<phone-ip>:8080",
     api_key="your-api-key",
-    verify_ssl=False,  # disable for debug plaintext server
 )
 
 client = PhoneApiClient(config)
@@ -90,28 +89,28 @@ All authenticated endpoints require the `Authorization: Bearer <api-key>` header
 ### Health (public)
 
 ```sh
-curl http://127.0.0.1:8080/api/v1/health
+curl http://<phone-ip>:8080/api/v1/health
 ```
 
 ### Auth Check
 
 ```sh
 curl -H "Authorization: Bearer $PHONE_API_KEY" \
-     http://127.0.0.1:8080/api/v1/auth/check
+     http://<phone-ip>:8080/api/v1/auth/check
 ```
 
 ### Battery Info
 
 ```sh
 curl -H "Authorization: Bearer $PHONE_API_KEY" \
-     http://127.0.0.1:8080/api/v1/battery
+     http://<phone-ip>:8080/api/v1/battery
 ```
 
 ### Device Info
 
 ```sh
 curl -H "Authorization: Bearer $PHONE_API_KEY" \
-     http://127.0.0.1:8080/api/v1/device
+     http://<phone-ip>:8080/api/v1/device
 ```
 
 ### Send Notification
@@ -121,7 +120,7 @@ curl -X POST \
      -H "Authorization: Bearer $PHONE_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{"title":"Homelab Alert","body":"Test notification","channel":"homelab","priority":"default"}' \
-     http://127.0.0.1:8080/api/v1/notify
+     http://<phone-ip>:8080/api/v1/notify
 ```
 
 ### With Request ID
@@ -131,13 +130,13 @@ Any endpoint accepts an optional `X-Request-ID` header for tracing:
 ```sh
 curl -H "Authorization: Bearer $PHONE_API_KEY" \
      -H "X-Request-ID: my-trace-id-123" \
-     http://127.0.0.1:8080/api/v1/battery
+     http://<phone-ip>:8080/api/v1/battery
 ```
 
 ## Security Notes
 
 - **Never commit API keys** to version control. Always use environment variables or a secrets manager.
-- **Use HTTPS in production.** The debug plaintext server (`127.0.0.1:8080`) is for local development only and must not be exposed on the network.
-- **Production default** is `https://phone.local:8443`. Set `verify_ssl=True` (the default) and ensure your CA certificate is trusted or provide a custom CA bundle.
+- **Use only trusted networks.** HTTP is intentionally enabled for local-network use, so API keys can be observed by anyone who can sniff that network.
+- **Default URL** is `http://phone.local:8080`. Replace `phone.local` with the phone IP address if local DNS/mDNS is not configured.
 - **API keys are phone-side managed.** Generate, reveal, reset, enable, and disable keys from the Android app — not from the client.
 - **Rotate keys** if you suspect compromise. Use the phone app to reset and re-export the key.

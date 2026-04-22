@@ -24,7 +24,6 @@ import com.jatm.androidphoneapi.server.ApiServerConfig
 import com.jatm.androidphoneapi.server.EmbeddedKtorApiServer
 import com.jatm.androidphoneapi.server.RequestOutcome
 import com.jatm.androidphoneapi.server.RequestOutcomeLogger
-import com.jatm.androidphoneapi.server.TlsConfigurationRequiredException
 
 class ApiServerForegroundService : Service() {
     private var apiServer: ApiServer? = null
@@ -46,7 +45,7 @@ class ApiServerForegroundService : Service() {
 
         return try {
             apiServer = EmbeddedKtorApiServer(
-                config = ApiServerConfig.forBuild(BuildConfig.DEBUG),
+                config = ApiServerConfig.localNetworkHttp(),
                 logger = AndroidRequestOutcomeLogger,
                 apiKeyAuthenticator = AppGraph.apiKeyRepository(applicationContext),
                 batteryInfoProvider = AndroidBatteryInfoProvider(applicationContext),
@@ -62,11 +61,6 @@ class ApiServerForegroundService : Service() {
             ).also { it.start() }
             ServerLifecycleRepository.markRunning()
             START_STICKY
-        } catch (exception: TlsConfigurationRequiredException) {
-            Log.w(TAG, "API server refused to start without TLS configuration")
-            ServerLifecycleRepository.markStopped()
-            stopSelf(startId)
-            START_NOT_STICKY
         } catch (exception: RuntimeException) {
             Log.e(TAG, "API server failed to start: ${exception::class.simpleName}")
             ServerLifecycleRepository.markStopped()

@@ -14,7 +14,7 @@ The initial scope should keep the project small while proving a secure, user-con
 Core project scope includes:
 - Android app shell with a home or settings screen showing server state.
 - Foreground service lifecycle for the API server when actively running.
-- Embedded HTTPS API server.
+- Embedded HTTP API server for trusted local-network use.
 - Phone-generated API key authentication with enable, disable, reset, and intentional reveal controls.
 - Health endpoint.
 - Battery and device info endpoints.
@@ -73,7 +73,7 @@ Local network:
 - Other LAN devices may scan ports, spoof addresses, replay traffic, brute-force credentials, or observe weak transport.
 
 Trusted homelab caller:
-- Trusted only when it presents the current API key over the approved transport.
+- Trusted only when it presents the current API key from the approved local-network deployment.
 - This project intentionally uses one shared API key for simplicity instead of per-client identity or grants.
 
 User/operator:
@@ -122,17 +122,17 @@ Rationale:
 - It avoids hand-rolled socket or HTTP handling in security-sensitive code.
 
 Constraints:
-- Production API transport is HTTPS.
-- Plain HTTP may exist only as an explicitly gated debug or test mode and must not be the default path.
+- API transport is HTTP by default for trusted local-network use.
+- Plain HTTP must not be exposed through port forwarding, public reverse proxies, or untrusted networks without a separate security review.
 - The server binds only when explicitly enabled by the user.
 - The server should prefer local-network exposure and avoid public internet assumptions.
 
 Risks to validate in implementation:
-- Android behavior for embedded TLS server certificates.
+- Device and router behavior for inbound LAN HTTP reachability.
 - APK size and dependency footprint.
 
 Alternatives considered:
-- NanoHTTPD: smaller, but weaker routing, middleware, and TLS ergonomics.
+- NanoHTTPD: smaller, but weaker routing and middleware ergonomics.
 - OkHttp MockWebServer: useful for tests, not a production embedded app server.
 - Raw sockets: too much custom security-sensitive code.
 
@@ -142,7 +142,7 @@ Decision: use phone-generated API keys as the current authentication model.
 Model:
 - On first launch or first API settings load, the app creates a strong random API key inside the phone app.
 - The API key can be enabled, disabled, reset, and intentionally revealed from the phone UI.
-- Normal API requests require the configured API key, sent only over the HTTPS production transport path.
+- Normal API requests require the configured API key, sent over the trusted local-network HTTP transport.
 - The server stores API-key material using Android-appropriate protected storage, preferring Keystore-backed encryption for recoverable secret material and constant-time hash comparison for request authentication.
 - Resetting the key immediately invalidates the previous key.
 - Disabling the API denies authenticated access without deleting the key.
@@ -153,7 +153,7 @@ Rationale:
 - Avoids trusting LAN location.
 - Keeps the phone user in control of API enablement and credential rotation.
 - Allows tests and middleware to stabilize before adding higher-risk phone capabilities.
-- Keeps mTLS available as a future hardening path without blocking current project usability.
+- Keeps TLS or mTLS available as a future hardening path without blocking current local-network usability.
 
 Future hardening path:
 - mTLS or per-client identity can be reconsidered later with a separate ADR if this project outgrows the shared API-key model.
@@ -186,8 +186,8 @@ Log or audit:
 For notification, file, location, and similar endpoints, log metadata and outcome rather than sensitive payloads.
 
 ## Hardening Checklist
-- Enforce HTTPS by default.
-- Keep plaintext transport behind explicit debug/test gates only.
+- Keep HTTP scoped to trusted local-network use.
+- Treat sniffing on the local network as a known risk of the selected transport model.
 - Generate API keys in-app with a cryptographically secure random source.
 - Store recoverable API-key material with Android-appropriate protection, preferring Keystore-backed encryption.
 - Store or compare authentication hashes using constant-time comparison.
@@ -195,7 +195,7 @@ For notification, file, location, and similar endpoints, log metadata and outcom
 - Centralize authentication and authorization so endpoints cannot bypass checks.
 - Add rate limits for failed auth, notification sends, and future write-like endpoints.
 - Use consistent error shapes that avoid leaking security-sensitive details.
-- Prefer Android Keystore-backed material for server private keys and secret wrapping.
+- Prefer Android Keystore-backed material for secret wrapping.
 - Require phone-side UI for API enable/disable and credential reveal/reset.
 - Document Android version constraints for notifications, clipboard, location, foreground services, and background execution.
 - Treat public exposure through VPN, tunnels, or reverse proxies as a separate deployment mode requiring review.

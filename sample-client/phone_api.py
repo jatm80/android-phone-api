@@ -17,7 +17,7 @@ class PhoneApiConfig:
 
     @classmethod
     def from_env(cls) -> "PhoneApiConfig":
-        base_url = os.environ.get("PHONE_API_URL", "https://phone.local:8443")
+        base_url = os.environ.get("PHONE_API_URL", "http://phone.local:8080")
         api_key = os.environ.get("PHONE_API_KEY", "")
         if not api_key:
             raise ValueError("PHONE_API_KEY environment variable is required")

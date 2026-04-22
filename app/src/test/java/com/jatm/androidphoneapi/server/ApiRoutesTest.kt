@@ -40,7 +40,6 @@ import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -104,24 +103,21 @@ class ApiRoutesTest {
     }
 
     @Test
-    fun defaultServerConfigRequiresTls() {
-        val server = EmbeddedKtorApiServer(
-            config = ApiServerConfig(),
-            timeProvider = TimeProvider { 123_456L },
-        )
+    fun defaultServerConfigAllowsLocalNetworkPlaintext() {
+        val config = ApiServerConfig()
 
-        assertThrows(TlsConfigurationRequiredException::class.java) {
-            server.start()
-        }
+        assertEquals("0.0.0.0", config.bindHost)
+        assertEquals(8080, config.port)
+        assertEquals(TransportMode.PLAINTEXT_LOCAL_NETWORK, config.transportMode)
     }
 
     @Test
-    fun debugBuildConfigUsesLoopbackPlaintextOnly() {
-        val config = ApiServerConfig.forBuild(isDebug = true)
+    fun namedLocalNetworkHttpConfigMatchesDefault() {
+        val config = ApiServerConfig.localNetworkHttp()
 
-        assertEquals("127.0.0.1", config.bindHost)
+        assertEquals("0.0.0.0", config.bindHost)
         assertEquals(8080, config.port)
-        assertEquals(TransportMode.PLAINTEXT_DEBUG_ONLY, config.transportMode)
+        assertEquals(TransportMode.PLAINTEXT_LOCAL_NETWORK, config.transportMode)
     }
 
     @Test
