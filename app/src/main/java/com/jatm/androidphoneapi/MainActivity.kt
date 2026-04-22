@@ -1,6 +1,13 @@
 package com.jatm.androidphoneapi
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
+import android.os.PersistableBundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -261,13 +268,27 @@ private fun ApiKeyControlsSection(
             }
         }
         apiKeyState.presentedKey?.let { key ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    modifier = Modifier.padding(16.dp),
-                    text = key,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                )
+            RevealedApiKeyCard(key = key)
+        }
+    }
+}
+
+@Composable
+private fun RevealedApiKeyCard(key: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = key,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+            )
+            OutlinedButton(onClick = { copyApiKeyToClipboard(context, key) }) {
+                Text("Copy")
             }
         }
     }
@@ -332,6 +353,19 @@ private fun formatTimestamp(epochMillis: Long): String {
     val instant = java.time.Instant.ofEpochMilli(epochMillis)
     val zoned = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
     return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(zoned)
+}
+
+private fun copyApiKeyToClipboard(context: Context, apiKey: String) {
+    val clip = ClipData.newPlainText("Android Phone API key", apiKey).apply {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+    }
+    val clipboard = context.getSystemService(ClipboardManager::class.java)
+    clipboard.setPrimaryClip(clip)
+    Toast.makeText(context, "API key copied", Toast.LENGTH_SHORT).show()
 }
 
 internal fun apiBaseUrlForDisplay(

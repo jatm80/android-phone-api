@@ -29,7 +29,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = versionNameOverride.orElse("0.1.1").get()
+        versionName = versionNameOverride.orElse("0.2.1").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

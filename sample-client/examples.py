@@ -36,6 +36,12 @@ def main():
     )
     print(json.dumps(result, indent=2))
 
+    print("\n=== Text to Speech ===")
+    print(json.dumps(client.speak("hello"), indent=2))
+
+    print("\n=== Take Photo ===")
+    print(json.dumps(client.capture_photo(), indent=2))
+
 
 if __name__ == "__main__":
     main()

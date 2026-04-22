@@ -84,3 +84,27 @@ class PhoneApiClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def speak(self, text: str, locale: str = "en-US", rate: float = 1.0, pitch: float = 1.0) -> dict:
+        resp = self._session.post(
+            self._url("/tts/speak"),
+            headers={"X-Request-ID": self._request_id()},
+            json={"text": text, "locale": locale, "rate": rate, "pitch": pitch},
+            timeout=self._config.timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def capture_photo(self, camera_id: Optional[str] = None, facing: str = "back") -> dict:
+        payload = {"facing": facing}
+        if camera_id is not None:
+            payload["cameraId"] = camera_id
+
+        resp = self._session.post(
+            self._url("/camera/capture"),
+            headers={"X-Request-ID": self._request_id()},
+            json=payload,
+            timeout=self._config.timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
