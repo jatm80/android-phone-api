@@ -22,7 +22,14 @@ val hasReleaseSigningConfig = listOf(
 
 android {
     namespace = "com.jatm.androidphoneapi"
-    compileSdk = 36
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
+    // Pinned to the build-tools installed in the Docker image (ANDROID_BUILD_TOOLS_VERSION);
+    // otherwise AGP falls back to its default and tries to download it into a read-only SDK.
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.jatm.androidphoneapi"
