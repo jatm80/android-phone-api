@@ -71,7 +71,7 @@ All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: B
 
 ### Tooling
 - Android Gradle Plugin 9.5.2 / Gradle 9.9.2
-- Compose BOM 2026.02.01 / Kotlin 2.3.20
+- Compose BOM 2026.11.01 / Kotlin 2.4.21
 - Java 17 toolchain
 - Docker-based development and CI
 
