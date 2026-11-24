@@ -109,7 +109,7 @@ jobs:
             exit 0
           fi
 
-          docker compose run --rm --entrypoint /opt/android-sdk/build-tools/36.0.0/apksigner android verify --verbose "${APK_PATH}"
+          docker compose run --rm --entrypoint /opt/android-sdk/build-tools/37.0.0/apksigner android verify --verbose "${APK_PATH}"
 
       - name: Rename and generate checksums
         run: |

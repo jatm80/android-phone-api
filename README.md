@@ -70,7 +70,7 @@ All endpoints under `/api/v1`. Authenticated endpoints require `Authorization: B
 - No rate limiting implemented yet for authenticated endpoints
 
 ### Tooling
-- Android Gradle Plugin 9.1.0 / Gradle 9.3.1
+- Android Gradle Plugin 9.5.2 / Gradle 9.9.2
 - Compose BOM 2026.02.01 / Kotlin 2.3.20
 - Java 17 toolchain
 - Docker-based development and CI

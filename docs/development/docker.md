@@ -9,9 +9,9 @@ Docker is the default development environment for this repository. Contributors 
 The development image is pinned to:
 - Eclipse Temurin JDK 17.
 - Android command-line tools `14742923`.
-- Android platform `android-36`.
-- Android build tools `36.0.0`.
-- Gradle `9.3.1`, verified with the published SHA-256 checksum.
+- Android platform `android-37.1` (compileSdk 37.1; targetSdk remains 36).
+- Android build tools `37.0.0`.
+- Gradle `9.9.2`, verified with the published SHA-256 checksum.
 
 The image does not contain signing keys or secrets.
 

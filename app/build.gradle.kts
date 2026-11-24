@@ -22,7 +22,11 @@ val hasReleaseSigningConfig = listOf(
 
 android {
     namespace = "com.jatm.androidphoneapi"
-    compileSdk = 36
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
 
     defaultConfig {
         applicationId = "com.jatm.androidphoneapi"

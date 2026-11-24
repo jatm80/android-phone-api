@@ -81,7 +81,7 @@ docker compose run --rm \
 Verify the resulting APK before installing it:
 
 ```sh
-docker compose run --rm --entrypoint /opt/android-sdk/build-tools/36.0.0/apksigner \
+docker compose run --rm --entrypoint /opt/android-sdk/build-tools/37.0.0/apksigner \
   android verify --verbose app/build/outputs/apk/release/android-phone-api-release.apk
 ```
 
